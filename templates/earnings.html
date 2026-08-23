@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %} · Earnings Scanner{% endblock %}
+{% block content %}
+
+<div class="dash">
+  <section class="panel">
+    <div class="panel-head">
+      <h3>Earnings Scanner <span class="panel-sub">every company reporting · ranked by squeeze readiness × directional conviction</span></h3>
+    </div>
+
+    <div class="proj-toolbar">
+      <label>Window
+        <div class="chart-mode-toggle" id="ern-window">
+          <button data-window="tomorrow">Tomorrow</button>
+          <button class="active" data-window="week">This week (5d)</button>
+          <button data-window="2week">2 weeks</button>
+        </div>
+      </label>
+      <label>Direction
+        <select id="ern-dir" class="pick">
+          <option value="all" selected>All</option>
+          <option value="bullish">Bullish only</option>
+          <option value="bearish">Bearish only</option>
+          <option value="neutral">Neutral</option>
+        </select>
+      </label>
+      <label>Min radar
+        <select id="ern-min-radar" class="pick">
+          <option value="0" selected>0+</option>
+          <option value="40">40+</option>
+          <option value="60">60+</option>
+          <option value="75">75+</option>
+        </select>
+      </label>
+      <label>IV
+        <select id="ern-iv" class="pick">
+          <option value="all" selected>All</option>
+          <option value="cheap">Cheap (low IV vs hist)</option>
+          <option value="rich">Rich (high IV vs hist)</option>
+          <option value="fair">Fair</option>
+        </select>
+      </label>
+      <button id="ern-refresh" class="btn-primary" style="margin-left:auto">Run scan</button>
+      <span id="ern-status" class="panel-sub" style="margin-left:12px">idle</span>
+    </div>
+
+    <div class="ern-table-wrap">
+      <table class="ern-table" id="ern-table">
+        <thead>
+          <tr>
+            <th data-sort="symbol" class="ern-sort">Symbol</th>
+            <th data-sort="date" class="ern-sort">Date</th>
+            <th data-sort="hour">When</th>
+            <th data-sort="spot" class="num">Spot</th>
+            <th data-sort="direction_score" class="num ern-sort">Dir −10..+10</th>
+            <th data-sort="direction_conf" class="num ern-sort">Conf</th>
+            <th data-sort="radar_score" class="num ern-sort">Radar 0-100</th>
+            <th data-sort="implied_move_pct" class="num ern-sort">Implied Move</th>
+            <th data-sort="historical_move_pct" class="num">Hist Move</th>
+            <th data-sort="iv_hist_ratio" class="num ern-sort">IV/Hist</th>
+            <th data-sort="atm_iv_pct" class="num">ATM IV</th>
+            <th data-sort="cp_oi_ratio" class="num">C/P OI</th>
+            <th data-sort="short_pct_float" class="num">Short %</th>
+            <th>Tags</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody id="ern-rows">
+          <tr><td colspan="15" class="ern-empty">Click "Run scan" to fetch tomorrow + this week's earnings.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="panel-sub" style="margin-top:14px">
+      <strong>How to read it.</strong> Direction score is −10 (max bearish) to +10 (max bullish), based on 25-delta risk reversal,
+      C/P OI imbalance, IV skew, short setup, and post-ER drift history. Conviction below 0.20 is shown as neutral.
+      Radar is the composite squeeze score (Short × GEX × Compression × RVol × Catalyst × Trend with synergy bonus).
+      <strong>IV/Hist</strong> &lt; 0.85 = options are cheap relative to typical earnings move (good for long premium plays);
+      &gt; 1.30 = rich (good for premium-selling iron condors / IC).
+    </p>
+  </section>
+</div>
+
+<style>
+  .ern-table-wrap { overflow-x: auto; margin-top: 14px; max-height: 75vh; overflow-y: auto; border: 1px solid rgba(28,36,53,0.6); border-radius: 8px; }
+  .ern-table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .ern-table th { background: #0e1722; padding: 8px 10px; text-align: left; color: #c9d3e3; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid rgba(28,36,53,0.8); position: sticky; top: 0; z-index: 1; }
+  .ern-table th.num { text-align: right; }
+  .ern-table th.ern-sort { cursor: pointer; user-select: none; }
+  .ern-table th.ern-sort:hover { color: #4cc9ff; }
+  .ern-table th.ern-sort.active { color: #4cc9ff; }
+  .ern-table td { padding: 6px 10px; border-bottom: 1px solid rgba(28,36,53,0.35); color: #c9d3e3; }
+  .ern-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ern-table tr:hover { background: rgba(28,36,53,0.4); }
+  .ern-table tr.row-hot { background: rgba(60,50,16,0.2); }
+  .ern-empty { padding: 30px; text-align: center; color: #8893a8; }
+
+  .ern-sym a { color: #4cc9ff; text-decoration: none; font-weight: 700; }
+  .ern-sym a:hover { text-decoration: underline; }
+
+  .ern-dir-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-weight: 700; font-size: 11px; min-width: 38px; text-align: center; }
+  .ern-dir-badge.bull-pos-3 { background: #064b32; color: #5fffaa; }
+  .ern-dir-badge.bull-pos-2 { background: #053f29; color: #4cffa0; }
+  .ern-dir-badge.bull-pos-1 { background: #03311f; color: #5cd6a0; }
+  .ern-dir-badge.bear-neg-3 { background: #4a1620; color: #ff7a8c; }
+  .ern-dir-badge.bear-neg-2 { background: #3a121a; color: #ff8d9d; }
+  .ern-dir-badge.bear-neg-1 { background: #2a0e15; color: #f49aa6; }
+  .ern-dir-badge.neutral    { background: #1c2435; color: #8893a8; }
+
+  .ern-conf { width: 50px; height: 6px; background: #1c2435; border-radius: 3px; display: inline-block; vertical-align: middle; }
+  .ern-conf .fill { height: 100%; background: #4cc9ff; border-radius: 3px; }
+
+  .ern-radar { display: inline-block; padding: 2px 7px; border-radius: 4px; font-weight: 700; }
+  .ern-radar.hot { background: rgba(255,213,64,0.18); color: #ffd540; }
+  .ern-radar.warm { background: rgba(76,201,255,0.14); color: #4cc9ff; }
+  .ern-radar.cold { color: #8893a8; }
+
+  .ern-iv-cheap { color: #29d896; }
+  .ern-iv-rich  { color: #ffb04c; }
+  .ern-iv-fair  { color: #8893a8; }
+
+  .ern-tag { display: inline-block; font-size: 9px; padding: 1px 5px; margin-right: 3px; border-radius: 99px; background: rgba(76,201,255,0.12); color: #4cc9ff; }
+  .ern-tag.multi-edge { background: rgba(255,213,64,0.18); color: #ffd540; }
+
+  .ern-hour { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: rgba(28,36,53,0.6); color: #8893a8; }
+  .ern-reason { font-size: 10px; color: #8893a8; max-width: 240px; }
+</style>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+let curWindow = 'week';
+let lastData = null;
+let sortKey = 'radar_score';
+let sortDir = -1;  // -1 = desc
+
+function dirBadgeClass(score) {
+  if (score >= 7) return 'bull-pos-3';
+  if (score >= 4) return 'bull-pos-2';
+  if (score >= 2) return 'bull-pos-1';
+  if (score <= -7) return 'bear-neg-3';
+  if (score <= -4) return 'bear-neg-2';
+  if (score <= -2) return 'bear-neg-1';
+  return 'neutral';
+}
+
+function fmtPct(v, dp) { dp = dp == null ? 1 : dp; return (v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(dp) + '%'); }
+function fmtNum(v, dp) { dp = dp == null ? 2 : dp; return (v == null ? '—' : v.toFixed(dp)); }
+function fmtDate(d) { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString([], {month:'short', day:'numeric', weekday:'short'}); }
+function fmtHour(h) { if (!h) return '—'; return h.toUpperCase(); }
+
+async function runScan() {
+  $('ern-status').textContent = 'scanning…';
+  $('ern-refresh').disabled = true;
+  try {
+    const r = await fetch(`/api/earnings_scan?window=${curWindow}&max_symbols=120`);
+    if (!r.ok) throw new Error('api error');
+    lastData = await r.json();
+    render();
+    $('ern-status').textContent = `${lastData.rows.length} symbols · ${lastData.window.from} → ${lastData.window.to}`;
+  } catch (e) {
+    $('ern-status').textContent = 'failed: ' + e.message;
+  } finally {
+    $('ern-refresh').disabled = false;
+  }
+}
+
+function render() {
+  const tbody = $('ern-rows');
+  if (!lastData || !lastData.rows.length) {
+    tbody.innerHTML = '<tr><td colspan="15" class="ern-empty">No earnings in window. Try expanding to 2 weeks, or set FINNHUB_KEY in keys.py.</td></tr>';
+    return;
+  }
+
+  const dirFilter = $('ern-dir').value;
+  const minRadar = parseFloat($('ern-min-radar').value);
+  const ivFilter = $('ern-iv').value;
+
+  let rows = lastData.rows.filter(r => {
+    if (dirFilter !== 'all' && r.direction !== dirFilter) return false;
+    if (r.radar_score < minRadar) return false;
+    if (ivFilter !== 'all' && r.iv_label !== ivFilter) return false;
+    return true;
+  });
+  rows.sort((a, b) => {
+    const va = a[sortKey], vb = b[sortKey];
+    if (typeof va === 'number') return (vb - va) * (sortDir < 0 ? 1 : -1);
+    return ('' + va).localeCompare('' + vb) * (sortDir < 0 ? -1 : 1);
+  });
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="15" class="ern-empty">No rows match your filters.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => `
+    <tr class="${r.radar_score >= 75 ? 'row-hot' : ''}">
+      <td class="ern-sym"><a href="/symbol/${r.symbol}">${r.symbol}</a></td>
+      <td>${fmtDate(r.date)}</td>
+      <td><span class="ern-hour">${fmtHour(r.hour)}</span></td>
+      <td class="num">$${(r.spot||0).toFixed(2)}</td>
+      <td class="num"><span class="ern-dir-badge ${dirBadgeClass(r.direction_score)}">${r.direction_score>0?'+':''}${r.direction_score}</span></td>
+      <td class="num"><span class="ern-conf"><span class="fill" style="width:${(r.direction_conf*100).toFixed(0)}%"></span></span></td>
+      <td class="num"><span class="ern-radar ${r.radar_score>=75?'hot':r.radar_score>=50?'warm':'cold'}">${r.radar_score.toFixed(0)}</span></td>
+      <td class="num">±${(r.implied_move_pct||0).toFixed(1)}%</td>
+      <td class="num">±${(r.historical_move_pct||0).toFixed(1)}%</td>
+      <td class="num ern-iv-${r.iv_label||'fair'}">${r.iv_hist_ratio? r.iv_hist_ratio.toFixed(2) : '—'}</td>
+      <td class="num">${r.atm_iv_pct? r.atm_iv_pct.toFixed(0)+'%' : '—'}</td>
+      <td class="num">${r.cp_oi_ratio? r.cp_oi_ratio.toFixed(2) : '—'}</td>
+      <td class="num">${r.short_pct_float? (r.short_pct_float*100).toFixed(1)+'%' : '—'}</td>
+      <td>${(r.radar_tags||[]).slice(0,4).map(t=>`<span class="ern-tag${t==='multi-edge'?' multi-edge':''}">${t}</span>`).join('')}</td>
+      <td class="ern-reason" title="${r.direction_reason||''}">${(r.direction_reason||'').slice(0,80)}</td>
+    </tr>
+  `).join('');
+}
+
+document.querySelectorAll('#ern-window button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#ern-window button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    curWindow = b.dataset.window;
+  });
+});
+$('ern-refresh').addEventListener('click', runScan);
+$('ern-dir').addEventListener('change', render);
+$('ern-min-radar').addEventListener('change', render);
+$('ern-iv').addEventListener('change', render);
+
+document.querySelectorAll('#ern-table th.ern-sort').forEach(th => {
+  th.addEventListener('click', () => {
+    const k = th.dataset.sort;
+    if (sortKey === k) sortDir = -sortDir;
+    else { sortKey = k; sortDir = -1; }
+    document.querySelectorAll('#ern-table th.ern-sort').forEach(x => x.classList.remove('active'));
+    th.classList.add('active');
+    render();
+  });
+});
+</script>
+{% endblock %}

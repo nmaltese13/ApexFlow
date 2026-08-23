@@ -1,0 +1,52 @@
+name: tests
+
+# The suite needs no network and no API keys: the analytics engines are
+# checked against closed-form values, and anything needing market data runs
+# against the frozen snapshot committed in data/demo/.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is included deliberately: zoneinfo has no system tz
+        # database there, so it exercises the tzdata dependency that
+        # analytics/timeutil.py relies on for DST-correct expiries.
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        env:
+          APEXFLOW_ATLAS_DISABLE: "1"
+          APEXFLOW_BRIEFING_DISABLE: "1"
+        run: python -m pytest tests/ -q
+
+      - name: Validate the Monte Carlo engine against closed form
+        run: python main.py validate-mc --paths 200000 --steps 128 --no-converge
+
+      - name: Smoke-test the app against the frozen dataset
+        env:
+          APEXFLOW_DEMO: "1"
+          APEXFLOW_ATLAS_DISABLE: "1"
+          APEXFLOW_BRIEFING_DISABLE: "1"
+        run: python scripts/smoke_test.py

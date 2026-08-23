@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#05070c">
+<title>ApexFlow{% block title %}{% endblock %} · Quant Terminal</title>
+<link rel="stylesheet" href="/static/css/apex.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%234cc9ff'/><stop offset='1' stop-color='%231798e0'/></linearGradient></defs><rect width='32' height='32' rx='7' fill='url(%23g)'/><text x='16' y='22' font-family='Inter,Arial' font-weight='800' font-size='18' fill='%2302111a' text-anchor='middle'>A</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<aside class="sidenav">
+  <div class="brand">
+    <div class="brand-mark">A</div>
+    <div class="brand-text">APEX<span>FLOW</span></div>
+  </div>
+  <nav>
+    <a href="/" class="navlink {% if page=='dashboard' %}active{% endif %}" data-tip="Flow Dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l4-4 4 4 7-7v3l-7 7-4-4-4 4z"/></svg>
+      <span>Flow</span>
+    </a>
+    <a href="/heatmap" class="navlink {% if page=='heatmap' %}active{% endif %}" data-tip="GEX Bar Chart">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2"/></svg>
+      <span>GEX</span>
+    </a>
+    <a href="/heatseeker" class="navlink {% if page=='heatseeker' %}active{% endif %}" data-tip="Heatseeker (Multi-Ticker GEX)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 3v3 M12 18v3 M3 12h3 M18 12h3"/></svg>
+      <span>Seek</span>
+    </a>
+    <a href="/radar" class="navlink {% if page=='radar' %}active{% endif %}" data-tip="Squeeze Radar — composite ranker">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12L20 6" /><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" opacity="0.4"/></svg>
+      <span>Radar</span>
+    </a>
+    <a href="/brief" class="navlink {% if page=='brief' %}active{% endif %}" data-tip="Morning Briefing — pre-computed analysis 24/7">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10 M7 13h10 M7 17h6"/></svg>
+      <span>Brief</span>
+    </a>
+    <a href="/earnings" class="navlink {% if page=='earnings' %}active{% endif %}" data-tip="Earnings Scanner — bullish/bearish/neutral table">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19l4-7 5 5 7-12"/><path d="M16 5h4v4"/></svg>
+      <span>Earn</span>
+    </a>
+    <a href="/watchlist" class="navlink {% if page=='watchlist' %}active{% endif %}" data-tip="Watchlist">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M12 2.5l2.6 7.4 7.9.1-6.4 4.6 2.4 7.5L12 17.7 5.5 22.1 7.9 14.6 1.5 10l7.9-.1z"/></svg>
+      <span>List</span>
+    </a>
+    <a href="/log" class="navlink {% if page=='log' %}active{% endif %}" data-tip="Signal Log">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 9h16 M4 14h16 M4 19h16"/></svg>
+      <span>Log</span>
+    </a>
+    <a href="/backtest" class="navlink {% if page=='backtest' %}active{% endif %}" data-tip="Backtest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-7"/></svg>
+      <span>BT</span>
+    </a>
+    <a href="/guide" class="navlink {% if page=='guide' %}active{% endif %}" data-tip="Guide & Strategy">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22.5z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/></svg>
+      <span>Guide</span>
+    </a>
+  </nav>
+  <div class="sidenav-footer">
+    <label class="theme-toggle" data-tip="Skylit color convention: yellow = positive gamma, purple = negative">
+      <input type="checkbox" id="gex-theme-toggle">
+      <span>Skylit theme</span>
+    </label>
+    <div class="status-dot {{ 'live' if active_provider != 'yfinance' else 'free' }}" data-tip="{{ active_provider }}"></div>
+    <div class="kbd-hint">⌘K</div>
+  </div>
+  <script>
+    // Apply persisted GEX color theme on every page
+    (function() {
+      const saved = localStorage.getItem('gex_theme') || 'default';
+      if (saved === 'skylit') document.documentElement.setAttribute('data-gex-theme', 'skylit');
+      const cb = document.getElementById('gex-theme-toggle');
+      if (!cb) return;
+      cb.checked = (saved === 'skylit');
+      cb.addEventListener('change', () => {
+        if (cb.checked) {
+          document.documentElement.setAttribute('data-gex-theme', 'skylit');
+          localStorage.setItem('gex_theme', 'skylit');
+        } else {
+          document.documentElement.removeAttribute('data-gex-theme');
+          localStorage.setItem('gex_theme', 'default');
+        }
+        // Trigger a redraw on Atlas/Heatseeker if those globals exist
+        if (typeof drawOverlay === 'function') drawOverlay();
+        if (typeof loadAll === 'function') loadAll();
+      });
+    })();
+  </script>
+</aside>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="search-wrap">
+        <input id="symbol-search" class="search" type="text" placeholder="Search ticker or run command…" autocomplete="off">
+        <span class="search-kbd">⌘K</span>
+      </div>
+    </div>
+    <div class="ticker-tape" id="ticker-tape">
+      <div class="ticker-loading">loading market data…</div>
+    </div>
+    <div class="topbar-right">
+      <div id="market-status" class="market-status" data-tip="US equities cash session">
+        <span class="dot"></span><span id="market-status-text">—</span>
+      </div>
+      <div class="provider-badge" data-tip="Active price/options provider">{{ active_provider }}</div>
+      <div class="clock" id="clock">{{ now }}</div>
+    </div>
+  </header>
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="appfoot">
+    <span class="muted">Provider:</span> <strong>{{ active_provider }}</strong>
+    <span class="sep">·</span>
+    {% for name, ok in providers.items() %}
+      <span class="kchip {{ 'on' if ok else 'off' }}">{{ name.split(' (')[0] }}</span>
+    {% endfor %}
+    <span class="sep">·</span>
+    <span class="muted">Data may be delayed. Educational research tool — not investment advice.</span>
+  </footer>
+
+</div>
+
+<!-- Command palette -->
+<div class="cmdk-overlay hidden" id="cmdk">
+  <div class="cmdk">
+    <input id="cmdk-input" class="cmdk-input" placeholder="Ticker symbol or command…" autocomplete="off">
+    <div class="cmdk-list" id="cmdk-list"></div>
+    <div class="cmdk-foot">
+      <span><span class="kbd">↵</span> open</span>
+      <span><span class="kbd">↑</span><span class="kbd">↓</span> navigate</span>
+      <span><span class="kbd">esc</span> close</span>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/apex.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

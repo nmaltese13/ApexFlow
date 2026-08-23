@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %} · Squeeze Radar{% endblock %}
+{% block content %}
+
+<div class="dash">
+  <section class="panel">
+    <div class="panel-head">
+      <h3>Squeeze Radar <span class="panel-sub">composite ranker · short pressure × GEX × compression × rvol × catalyst × trend</span></h3>
+    </div>
+
+    <div class="proj-toolbar">
+      <label>Universe
+        <select id="rdr-universe" class="pick">
+          <option value="data/test_universe.txt" selected>Test (~30 names)</option>
+          <option value="sp100">S&amp;P 100</option>
+          <option value="optionable">Optionable (curated)</option>
+        </select>
+      </label>
+      <label>Min score
+        <select id="rdr-min" class="pick">
+          <option value="40">40</option>
+          <option value="50" selected>50</option>
+          <option value="60">60</option>
+          <option value="70">70</option>
+        </select>
+      </label>
+      <label>Limit
+        <select id="rdr-limit" class="pick">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
+      <button id="rdr-refresh" class="btn-primary" style="margin-left:auto">Run</button>
+      <span id="rdr-status" class="panel-sub" style="margin-left:12px">idle</span>
+    </div>
+
+    <div id="rdr-list" style="display:flex; flex-direction:column; gap:8px; margin-top:14px"></div>
+
+    <p class="panel-sub" style="margin-top:14px">
+      <strong>Reading the layers.</strong>
+      Each row shows six layer scores 0-100. <em>Short</em> = float locked + DTC + borrow.
+      <em>GEX</em> = proximity to a heavy gamma wall plus geometry (negative wall under spot or positive wall over spot).
+      <em>Comp</em> = TTM squeeze + Bollinger bandwidth at session lows.
+      <em>RVol</em> = 5d/20d swelling. <em>Cat</em> = earnings inside 14d.
+      <em>Trend</em> = above 20EMA + slope, not extended.
+      A <strong>multi-edge</strong> tag appears when ≥3 layers each score ≥60 — that's where the synergy bonus comes from.
+    </p>
+  </section>
+</div>
+
+<style>
+  .rdr-row { background: rgba(11, 17, 26, 0.55); border: 1px solid rgba(28, 36, 53, 0.7); border-radius: 8px; padding: 10px 14px; }
+  .rdr-row.hot { border-color: rgba(255, 213, 64, 0.55); background: rgba(60, 50, 16, 0.20); }
+  .rdr-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .rdr-sym { font-weight: 700; font-size: 16px; min-width: 70px; }
+  .rdr-score { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; min-width: 60px; }
+  .rdr-score.hot { color: #ffd540; }
+  .rdr-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rdr-tag { font-size: 10px; padding: 2px 8px; border-radius: 99px; background: rgba(76, 201, 255, 0.12); color: #4cc9ff; }
+  .rdr-tag.hot { background: rgba(255, 213, 64, 0.18); color: #ffd540; }
+  .rdr-reason { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8893a8; margin-left: auto; }
+  .rdr-bars { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .rdr-bar { background: rgba(28, 36, 53, 0.6); border-radius: 4px; height: 28px; position: relative; overflow: hidden; }
+  .rdr-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(76,201,255,0.45), rgba(76,201,255,0.85)); border-radius: 4px; transition: width 0.4s ease; }
+  .rdr-bar-fill.fire { background: linear-gradient(90deg, rgba(41,216,150,0.55), rgba(41,216,150,0.95)); }
+  .rdr-bar-label { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 10px; color: #c9d3e3; text-transform: uppercase; letter-spacing: 0.5px; pointer-events: none; }
+  .rdr-bar-value { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #fff; pointer-events: none; }
+  .rdr-empty { padding: 24px; text-align: center; color: #8893a8; }
+</style>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+const LAYERS = [['short','Short'],['gex','GEX'],['compression','Comp'],['rvol','RVol'],['catalyst','Cat'],['trend','Trend']];
+
+async function runRadar() {
+  const universe = $('rdr-universe').value;
+  const min_score = $('rdr-min').value;
+  const limit = $('rdr-limit').value;
+  $('rdr-status').textContent = 'scanning…';
+  $('rdr-refresh').disabled = true;
+  try {
+    const r = await fetch(`/api/radar?universe=${encodeURIComponent(universe)}&min_score=${min_score}&limit=${limit}`);
+    if (!r.ok) throw new Error('api error');
+    const data = await r.json();
+    render(data);
+    $('rdr-status').textContent = `${data.signals.length} of ${data.count} (universe ${data.universe_size})`;
+  } catch (e) {
+    $('rdr-status').textContent = 'failed: ' + e.message;
+  } finally {
+    $('rdr-refresh').disabled = false;
+  }
+}
+
+function render(data) {
+  const list = $('rdr-list');
+  list.innerHTML = '';
+  if (!data.signals.length) {
+    list.innerHTML = '<div class="rdr-empty">No symbols cleared the threshold. Lower min score, expand universe, or wait for the snapshot loop to warm up.</div>';
+    return;
+  }
+  data.signals.forEach(sig => {
+    const layers = sig.metrics?.layer_scores || {};
+    const isHot = sig.score >= 75;
+    const row = document.createElement('div');
+    row.className = 'rdr-row' + (isHot ? ' hot' : '');
+    const tagsHtml = (sig.tags || []).map(t =>
+      `<span class="rdr-tag${t === 'multi-edge' ? ' hot' : ''}">${t}</span>`
+    ).join('');
+    const barsHtml = LAYERS.map(([k, label]) => {
+      const v = Math.max(0, Math.min(100, Math.round(layers[k] || 0)));
+      const fire = v >= 60;
+      return `<div class="rdr-bar">
+        <div class="rdr-bar-fill${fire ? ' fire' : ''}" style="width:${v}%"></div>
+        <span class="rdr-bar-label">${label}</span>
+        <span class="rdr-bar-value">${v}</span>
+      </div>`;
+    }).join('');
+    row.innerHTML = `
+      <div class="rdr-head">
+        <span class="rdr-sym"><a href="/symbol/${sig.symbol}" style="color:inherit;text-decoration:none">${sig.symbol}</a></span>
+        <span class="rdr-score${isHot ? ' hot' : ''}">${sig.score.toFixed(0)}</span>
+        <div class="rdr-tags">${tagsHtml}</div>
+        <span class="rdr-reason">${sig.reason || ''}</span>
+      </div>
+      <div class="rdr-bars">${barsHtml}</div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+$('rdr-refresh').addEventListener('click', runRadar);
+runRadar();
+</script>
+{% endblock %}

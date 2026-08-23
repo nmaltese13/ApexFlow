@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% block title %} · Guide{% endblock %}
+{% block content %}
+
+<div class="guide-wrap">
+
+  <!-- Sticky table of contents -->
+  <aside class="guide-toc" id="guide-toc">
+    <h4>Contents</h4>
+    <a href="#overview">Overview</a>
+    <a href="#what-is-gex">What is GEX?</a>
+    <a href="#colors">Color spectrum</a>
+    <a href="#magnet">Magnet strikes</a>
+    <a href="#airzone">Air zones</a>
+    <a href="#flip">Gamma flip</a>
+    <a href="#stacks">Stacked levels</a>
+    <a href="#layers">Expiry layers</a>
+    <a href="#chart">Projection chart</a>
+    <a href="#probtable">Probability table</a>
+    <a href="#em">Expected move</a>
+    <a href="#setups">Finding setups</a>
+    <a href="#checklist">Checklist</a>
+    <a href="#caveats">Caveats</a>
+  </aside>
+
+  <article class="guide-body">
+
+    <h1 id="overview">ApexFlow Guide</h1>
+    <p class="lede">
+      A practical walk-through of how the Heatseeker matrix, the projection chart,
+      and the probability tools fit together — and a checklist of setups you can
+      hunt with them.
+    </p>
+
+    <!-- =================================================================== -->
+    <h2 id="what-is-gex">What is GEX?</h2>
+    <p>
+      <strong>Gamma exposure (GEX)</strong> is the amount of stock dealers must buy or sell
+      at each strike to stay neutral. When traders buy options, dealers take the
+      other side and hedge by trading the underlying. <em>How much</em> they have to
+      hedge depends on the option's <strong>gamma</strong> — and gamma is concentrated near
+      the strike price.
+    </p>
+    <p>
+      Sum that hedging requirement across every open interest contract at every strike
+      and you get a <strong>landscape of forced flow</strong>: levels where dealers will buy
+      stock if price falls below, levels where they'll sell if price rises through.
+      That landscape behaves like mechanical support and resistance.
+    </p>
+    <div class="callout">
+      <strong>Why it matters.</strong> GEX walls don't predict the future, they describe
+      the <em>plumbing</em>. Like seeing where speed bumps are on a road. Price still does
+      what news/flow makes it do — but when it gets near a big GEX wall, the road
+      changes.
+    </div>
+
+    <!-- =================================================================== -->
+    <h2 id="colors">Color spectrum</h2>
+    <p>
+      Each cell in the Heatseeker matrix shows the <strong>net dollar GEX at that strike</strong>.
+      Color encodes both <em>sign</em> (positive vs. negative) and <em>magnitude</em>:
+    </p>
+    <div class="swatch-row">
+      <div class="swatch">
+        <div class="swatch-bar" style="background:rgba(255,213,64,0.85)"></div>
+        <div class="swatch-cap"><strong>Bright yellow</strong> Strong positive GEX. Pinning / absorbing — price slows, gets sticky.</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-bar" style="background:rgba(41,216,150,0.65)"></div>
+        <div class="swatch-cap"><strong>Green</strong> Mid positive. Mild support / resistance.</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-bar" style="background:rgba(20,26,38,0.6)"></div>
+        <div class="swatch-cap"><strong>Dim</strong> Near-zero GEX. Air zone — price moves through fast.</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-bar" style="background:rgba(76,201,255,0.65)"></div>
+        <div class="swatch-cap"><strong>Cyan</strong> Mid negative. Mild acceleration zone.</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-bar" style="background:rgba(176,123,255,0.85)"></div>
+        <div class="swatch-cap"><strong>Bright purple</strong> Strong negative GEX. Acceleration — price expands volatility through this level.</div>
+      </div>
+    </div>
+    <p>
+      <strong>The continuous red line</strong> across each pane is current spot price. The
+      thicker / brighter the cell, the more material the level. Dim italic cells are
+      <em>air zones</em> where there's almost no dealer hedging — price has a clear runway
+      between meaningful walls.
+    </p>
+
+    <!-- =================================================================== -->
+    <h2 id="magnet">Magnet strikes</h2>
+    <p>
+      The strike with the largest absolute GEX in scope is the <strong>primary magnet</strong> —
+      surrounded by a yellow halo. The next four largest are <strong>secondary magnets</strong>
+      with a thinner yellow border.
+    </p>
+    <ul>
+      <li><strong>Positive magnets (yellow)</strong> behave like glue. Price tends to drift toward them, then chop around them. Good fade / mean-reversion territory while in regime.</li>
+      <li><strong>Negative magnets (purple)</strong> behave like trampolines. Price often slows on approach, then accelerates away. Be careful pressing trades into them in either direction — moves get explosive.</li>
+    </ul>
+    <p>
+      The footer of each pane shows the primary magnet strike and the gamma flip price
+      so you can read the structure at a glance.
+    </p>
+
+    <!-- =================================================================== -->
+    <h2 id="airzone">Air zones</h2>
+    <p>
+      Strikes where dealers have minimal hedging needs (less than ~10% of the largest
+      level) render dim and italic. <strong>Price moves through these zones quickly</strong>
+      because nothing is mechanically slowing it down.
+    </p>
+    <p>
+      An air zone <em>between spot and the next magnet</em> is one of the most useful patterns
+      in the matrix — it tells you the path of least resistance to the next decision
+      point.
+    </p>
+
+    <!-- =================================================================== -->
+    <h2 id="flip">Gamma flip</h2>
+    <p>
+      The <strong>gamma flip</strong> is the price level where cumulative dealer GEX crosses zero.
+    </p>
+    <ul>
+      <li><strong>Above the flip</strong>, dealers are net long gamma → they lean <em>against</em> the move (sell rallies, buy dips). Markets feel sticky, ranges hold, intraday vol is suppressed.</li>
+      <li><strong>Below the flip</strong>, dealers are net short gamma → they lean <em>with</em> the move (sell dips, buy rallies). Markets feel slippery, breakouts work, intraday vol expands.</li>
+    </ul>
+    <p>
+      A regime change at the flip is one of the most reliable setups: positions that
+      worked above the flip often <em>stop working</em> below it, and vice versa.
+    </p>
+
+    <!-- =================================================================== -->
+    <h2 id="stacks">Stacked levels</h2>
+    <p>
+      When two adjacent strikes have <strong>opposite-sign GEX of meaningful size</strong>,
+      the structure becomes a loaded spring. Two patterns:
+    </p>
+    <div class="setup-grid">
+      <div class="setup-card">
+        <h4>Reverse stack <span class="setup-tag bear">bearish bias</span></h4>
+        <p>Positive GEX over negative GEX. Price sits on a yellow shelf, but if it slips below into the purple, the floor falls out — there's no support all the way to the next magnet.</p>
+        <div class="setup-cue"><strong>Watch for:</strong> sharp candle close below the upper strike on volume.</div>
+      </div>
+      <div class="setup-card">
+        <h4>Spring stack <span class="setup-tag bull">bullish bias</span></h4>
+        <p>Negative GEX under positive GEX. Price compresses below a yellow ceiling. A break above flips the magnet from resistance to support and momentum tends to extend.</p>
+        <div class="setup-cue"><strong>Watch for:</strong> a clean reclaim of the upper strike with follow-through.</div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <h2 id="layers">Expiry layers</h2>
+    <p>
+      Different option expirations exert different kinds of force. The toolbar has
+      three preset layers plus All:
+    </p>
+    <ul>
+      <li><strong>Front (0–2 DTE)</strong> — drives <em>intraday speed</em>. Where 0DTE traders pile in. Magnets here often hold for hours, then evaporate after expiry.</li>
+      <li><strong>Middle (7–30 DTE)</strong> — drives <em>weekly drift</em>. The "cleanest" gamma view for swing trading. Less noise from 0DTE chop.</li>
+      <li><strong>Back (45+ DTE)</strong> — drives <em>structural gravity</em>. The longer-term institutional positioning. Slow to change but heavy.</li>
+      <li><strong>All</strong> — blended view; useful for context but the levels can be diluted.</li>
+    </ul>
+    <p>
+      Pro tip: when Front and Middle <em>agree</em> on a magnet (same strike shows up bright
+      in both), that level is a high-conviction zone.
+    </p>
+
+    <!-- =================================================================== -->
+    <h2 id="chart">Projection chart</h2>
+    <p>
+      The chart at the top of Heatseeker shows recent price candles, with all the
+      gamma walls drawn as horizontal lines and a forward <strong>probability cone</strong> projecting
+      the price distribution to your selected horizon.
+    </p>
+    <h3>What's drawn</h3>
+    <ul>
+      <li><strong>Yellow lines</strong> — positive GEX walls. Likely magnets / pin levels.</li>
+      <li><strong>Purple lines</strong> — negative GEX walls. Likely accelerators / breakout pivots.</li>
+      <li><strong>Brightest yellow line</strong> — primary magnet. Each line label shows the wall's $GEX and the touch probability.</li>
+      <li><strong>Cyan median path</strong> — the expected price drift under risk-neutral assumptions (median of the lognormal distribution).</li>
+      <li><strong>Cyan cone (P5/P25/P50/P75/P95)</strong> — the percentile envelope of where price could be at the horizon. The wider the cone, the higher the implied vol or longer the horizon.</li>
+    </ul>
+    <p>
+      Toggle <strong>TradingView Pro</strong> to swap in a full TradingView chart with the standard
+      indicators (BB, EMA, RSI, VWAP, Volume, Pivots) and TV's drawing tools — useful
+      when you want to draw your own levels or use other studies.
+    </p>
+
+    <!-- =================================================================== -->
+    <h2 id="probtable">Probability table</h2>
+    <p>
+      The right-side table lists each gamma wall with two probabilities, computed
+      from the lognormal price distribution under current ATM IV:
+    </p>
+    <ul>
+      <li><strong>Touch %</strong> — probability that price <em>reaches</em> this strike at any time before the horizon. Computed via the reflection principle on geometric Brownian motion.</li>
+      <li><strong>Above %</strong> — probability that price <em>finishes</em> above this strike at the horizon. This is the standard <code>N(d₂)</code> implied terminal probability.</li>
+    </ul>
+    <p>
+      The bar behind each value is a quick visual indicator of magnitude. <strong>Touch is
+      always ≥ Above</strong> — the price might get there and come back.
+    </p>
+    <div class="callout warn">
+      Probabilities use the implied volatility surface as their input. They are
+      <em>risk-neutral</em>, not real-world. They're best read as "what the options market
+      thinks today" — useful for sizing and timing, not as a crystal ball.
+    </div>
+
+    <!-- =================================================================== -->
+    <h2 id="em">Expected move</h2>
+    <p>
+      The sidebar shows the <strong>1σ expected dollar move</strong> for your horizon:
+      <code>spot × IV × √(t)</code>. Roughly two-thirds of the time price will finish
+      inside this range; one-third of the time it won't.
+    </p>
+    <p>
+      Compare it to the gamma walls:
+    </p>
+    <ul>
+      <li>If a strong magnet sits <em>well inside</em> the 1σ range, expect price to gravitate there.</li>
+      <li>If the next magnet sits <em>just past</em> the 1σ band, breaking through it has lasting weight.</li>
+      <li>If price already pierced 1σ early in the day, the rest of the move tends to be reversion (fade) unless a hard catalyst is driving it.</li>
+    </ul>
+
+    <!-- =================================================================== -->
+    <h2 id="setups">Recognising configurations</h2>
+    <p>
+      The matrix and chart together surface a handful of repeatable gamma
+      configurations. Each describes <em>where dealer hedging flow would come
+      from</em> and what that mechanically does to realised volatility around
+      a level. Read the gamma flip first — the same strike layout means
+      opposite things on either side of it.
+    </p>
+    <p class="note">
+      These are structural descriptions, not recommendations. ApexFlow does
+      not tell you what to do with them, and the mechanism described only
+      holds while the dealer-positioning assumption behind GEX holds — see
+      <a href="#caveats">Caveats</a>.
+    </p>
+
+    <h3>Above the flip · long-gamma regime</h3>
+    <div class="setup-grid">
+      <div class="setup-card">
+        <h4>Magnet pin <span class="setup-tag range">range</span></h4>
+        <p>Spot is near a strong yellow magnet with no opposing wall close by.</p>
+        <div class="setup-cue"><strong>Mechanism:</strong> positive dealer gamma means hedges are sold into strength and bought into weakness, compressing realised vol around the level. Price tends to chop rather than trend while this holds.</div>
+      </div>
+      <div class="setup-card">
+        <h4>Positive magnet above spot <span class="setup-tag fade">resistance</span></h4>
+        <p>Price runs toward an above-spot positive magnet on weak follow-through.</p>
+        <div class="setup-cue"><strong>Mechanism:</strong> approaching the strike grows dealer long gamma, so hedging flow leans against the move. The level acts as static resistance until the gamma there is exhausted or rolls off.</div>
+      </div>
+      <div class="setup-card">
+        <h4>Positive magnet below spot <span class="setup-tag fade">support</span></h4>
+        <p>Price drops toward a below-spot positive magnet without a catalyst.</p>
+        <div class="setup-cue"><strong>Mechanism:</strong> the mirror image — dealer hedging buys weakness into the strike, so the level tends to absorb downside in the absence of news.</div>
+      </div>
+    </div>
+
+    <h3>Below the flip · short-gamma regime</h3>
+    <div class="setup-grid">
+      <div class="setup-card">
+        <h4>Air zone <span class="setup-tag bull">expansion</span></h4>
+        <p>Spot has cleared a magnet with several strikes of near-zero GEX above (or below).</p>
+        <div class="setup-cue"><strong>Mechanism:</strong> with little gamma to hedge, dealer flow neither damps nor amplifies much — there is simply no structural brake between here and the next magnet, so moves travel further per unit of order flow.</div>
+      </div>
+      <div class="setup-card">
+        <h4>Negative under positive <span class="setup-tag bull">unstable</span></h4>
+        <p>Negative GEX sits beneath positive GEX and price is at the boundary.</p>
+        <div class="setup-cue"><strong>Mechanism:</strong> the hedging regime changes character as price crosses. Below the boundary dealers chase moves; above it they lean against them. Volatility is regime-dependent right at the crossing.</div>
+      </div>
+      <div class="setup-card">
+        <h4>Positive over negative <span class="setup-tag bear">unstable</span></h4>
+        <p>Positive GEX sits above negative GEX and spot fails the upper shelf.</p>
+        <div class="setup-cue"><strong>Mechanism:</strong> losing the shelf moves price into territory where dealer hedging runs <em>with</em> the move rather than against it, so realised vol expands on the downside.</div>
+      </div>
+    </div>
+
+    <h3>Either regime</h3>
+    <div class="setup-grid">
+      <div class="setup-card">
+        <h4>Multi-layer alignment <span class="setup-tag bull">persistent</span></h4>
+        <p>The same strike is a magnet in both the Front (0–2 DTE) and Middle (7–30 DTE) layers.</p>
+        <div class="setup-cue"><strong>Mechanism:</strong> the level is reinforced by two different time-horizon flows, so it survives individual expirations — dealers re-stack there as near-dated contracts roll off. Structurally the most durable kind of level.</div>
+      </div>
+      <div class="setup-card">
+        <h4>Touch / above divergence <span class="setup-tag fade">two questions</span></h4>
+        <p>A strike shows high Touch % but low Above %.</p>
+        <div class="setup-cue"><strong>Mechanism:</strong> these answer different questions. Touch is a <em>path</em> probability (does price tag the level at any point), Above is a <em>terminal</em> one (does it finish beyond). Touch is always the larger, and roughly double for a driftless barrier — a wide gap is normal geometry, not an anomaly.</div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <h2 id="checklist">Reading a symbol, in order</h2>
+    <p>A sequence for interpreting the display — what to look at and in what order.</p>
+    <ol class="checklist">
+      <li>Where is spot relative to the zero-gamma level? That sets which regime everything below is read in.</li>
+      <li>Is the flip <em>bracketed</em>? If the panel says “no flip within ±25%”, there is no crossing in the searched range and the regime label is the whole answer.</li>
+      <li>How trustworthy is the ATM IV? A <em>low confidence</em> flag means the near-the-money strikes disagreed badly, and every probability below inherits that.</li>
+      <li>Where is the primary magnet, and is it above or below spot?</li>
+      <li>Is there an air zone between spot and the next magnet?</li>
+      <li>Do the Front and Middle layers agree on the magnet?</li>
+      <li>What is the 1σ expected move over your horizon, and where do the magnets sit relative to it?</li>
+      <li>What does the probability table say — and are you reading Touch or Above?</li>
+      <li>What is in the catalyst window — earnings, FOMC, CPI, OPEX? Positioning can reshape completely across an event.</li>
+    </ol>
+
+    <!-- =================================================================== -->
+    <h2 id="caveats">Caveats</h2>
+    <ul>
+      <li><strong>Free data is delayed.</strong> The free yfinance feed is ~15-min delayed and doesn't include real-time flow / dark-pool prints. For live tape add a paid provider key to <code>keys.py</code>.</li>
+      <li><strong>GEX is dealer-implied.</strong> It assumes typical dealer positioning (long calls, short puts). Real dealer books can differ; treat the levels as guides not gospel.</li>
+      <li><strong>Probabilities are risk-neutral.</strong> They use the implied vol the market is currently pricing — they update as IV updates.</li>
+      <li><strong>Gamma walls expire.</strong> 0DTE walls evaporate after the cash close. Re-check before each session.</li>
+      <li><strong>This is research, not trading advice.</strong> Always paper-validate before risking capital.</li>
+    </ul>
+
+  </article>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// Highlight active TOC entry as you scroll
+const links = document.querySelectorAll('#guide-toc a');
+const sections = Array.from(links).map(a => document.querySelector(a.getAttribute('href')));
+function onScroll() {
+  let activeIdx = 0;
+  for (let i = 0; i < sections.length; i++) {
+    if (!sections[i]) continue;
+    const top = sections[i].getBoundingClientRect().top;
+    if (top < 120) activeIdx = i;
+  }
+  links.forEach((a, i) => a.classList.toggle('active', i === activeIdx));
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+{% endblock %}

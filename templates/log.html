@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %} · Signal Log{% endblock %}
+{% block content %}
+
+<div class="dash">
+  <section class="panel">
+    <div class="panel-head">
+      <h3>Signal Log</h3>
+      <div class="inline-controls">
+        <input id="filt-sym" class="pick" type="text" placeholder="Filter symbol" style="width:140px;text-transform:uppercase">
+        <select id="filt-scanner" class="pick">
+          <option value="">All scanners</option>
+          <option>options-flow</option>
+          <option>pre-breakout</option>
+          <option>momentum</option>
+          <option>squeeze</option>
+          <option>earnings</option>
+        </select>
+        <select id="filt-min-score" class="pick">
+          <option value="0">Any score</option>
+          <option value="50">Score ≥ 50</option>
+          <option value="70">Score ≥ 70</option>
+          <option value="85">Score ≥ 85</option>
+        </select>
+        <a class="btn-secondary" href="/api/log?limit=500" download="apexflow_log.json">Export</a>
+      </div>
+    </div>
+
+    {% if not records %}
+      <div class="empty">
+        <div class="empty-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 9h16 M4 14h16 M4 19h16"/></svg>
+        </div>
+        <div>No signals logged yet. Run a scan from the dashboard.</div>
+      </div>
+    {% else %}
+    <div class="log-scroll">
+      <table class="dtable" id="log-table">
+        <thead><tr>
+          <th class="mono">Time</th><th>Scanner</th><th>Symbol</th><th class="r">Score</th>
+          <th>Tags</th><th>Reason</th>
+        </tr></thead>
+        <tbody>
+          {% for r in records %}
+          <tr data-sym="{{ r.symbol }}" data-scanner="{{ r.scanner }}" data-score="{{ r.score }}">
+            <td class="muted-sm mono">{{ r.timestamp[:19].replace('T',' ') }}</td>
+            <td>{{ r.scanner }}</td>
+            <td><a class="sym" href="/symbol/{{ r.symbol }}">{{ r.symbol }}</a></td>
+            <td class="r mono"><span class="score-{{ 'hot' if r.score>=85 else 'warm' if r.score>=70 else 'mild' }}">{{ '%.0f' % r.score }}</span></td>
+            <td class="muted-sm">{{ (r.tags or []) | join(', ') }}</td>
+            <td class="reason">{{ r.reason }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">Showing <strong id="log-count">{{ records|length }}</strong> entries (newest first).</p>
+    {% endif %}
+  </section>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function applyFilters() {
+  const sym = document.getElementById('filt-sym').value.toUpperCase();
+  const sc  = document.getElementById('filt-scanner').value;
+  const ms  = parseFloat(document.getElementById('filt-min-score').value || '0');
+  let visible = 0;
+  document.querySelectorAll('#log-table tbody tr').forEach(r => {
+    const okS  = !sym || r.dataset.sym.includes(sym);
+    const okC  = !sc || r.dataset.scanner === sc;
+    const okSc = parseFloat(r.dataset.score) >= ms;
+    const show = okS && okC && okSc;
+    r.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  const ct = document.getElementById('log-count');
+  if (ct) ct.textContent = visible;
+}
+document.getElementById('filt-sym')?.addEventListener('input', applyFilters);
+document.getElementById('filt-scanner')?.addEventListener('change', applyFilters);
+document.getElementById('filt-min-score')?.addEventListener('change', applyFilters);
+</script>
+{% endblock %}

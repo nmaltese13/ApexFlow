@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %} · Watchlist{% endblock %}
+{% block content %}
+
+<div class="dash">
+  <section class="panel">
+    <div class="panel-head">
+      <h3>Watchlist</h3>
+      <div class="inline-controls">
+        <span class="panel-sub">Auto-populated by scans (score ≥ 60)</span>
+        <button id="wl-clear" class="btn-secondary">Clear</button>
+      </div>
+    </div>
+
+    {% if not entries %}
+      <div class="empty">
+        <div class="empty-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2.5l2.6 7.4 7.9.1-6.4 4.6 2.4 7.5L12 17.7 5.5 22.1 7.9 14.6 1.5 10l7.9-.1z"/></svg>
+        </div>
+        <div>Empty. Run scans on the dashboard — high-scoring symbols populate here.</div>
+      </div>
+    {% else %}
+    <table class="dtable">
+      <thead><tr>
+        <th>Symbol</th><th class="r">Score</th><th>Top Scanner</th><th>Hit By</th>
+        <th>Tags</th><th>Reason</th><th>Added</th>
+      </tr></thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td><a class="sym" href="/symbol/{{ e.symbol }}">{{ e.symbol }}</a></td>
+          <td class="r mono"><span class="score-{{ 'hot' if e.best_score>=85 else 'warm' if e.best_score>=70 else 'mild' }}">{{ '%.0f' % e.best_score }}</span></td>
+          <td>{{ e.best_scanner }}</td>
+          <td>{{ e.scanners_hit | join(', ') }}</td>
+          <td class="muted-sm">{{ e.tags | join(', ') }}</td>
+          <td class="reason">{{ e.reason }}</td>
+          <td class="muted-sm mono">{{ e.added_at[:19].replace('T',' ') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('wl-clear')?.addEventListener('click', async () => {
+  if (!confirm('Clear watchlist?')) return;
+  await fetch('/api/watchlist', { method: 'DELETE' });
+  toast('Watchlist cleared', 'ok');
+  setTimeout(() => location.reload(), 600);
+});
+</script>
+{% endblock %}

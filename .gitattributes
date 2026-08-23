@@ -1,0 +1,12 @@
+# Normalise line endings: LF in the repository, native in the working tree.
+* text=auto
+
+# Explicitly binary — never touch these.
+*.json.gz binary
+*.db binary
+*.png binary
+*.jpg binary
+*.ico binary
+
+# Shell scripts must keep LF even when checked out on Windows.
+*.sh text eol=lf

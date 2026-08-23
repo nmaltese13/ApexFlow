@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %} · Flow{% endblock %}
+{% block content %}
+
+<div class="dash-v2">
+
+  <!-- ============================================================
+       Row 1 — Market regime (compact, single horizontal strip)
+       ============================================================ -->
+  <section class="panel-v2">
+    <div class="regime-strip-v2" id="regime-strip-v2">
+      <div class="rcell"><span class="rl">VIX</span><span class="rv" id="r2-vix">—</span><span class="rs" id="r2-vix-sub"></span></div>
+      <div class="rcell"><span class="rl">Regime</span><span class="rv" id="r2-regime">—</span></div>
+      <div class="rcell"><span class="rl">SPY vs 50EMA</span><span class="rv" id="r2-spy">—</span></div>
+      <div class="rcell"><span class="rl">Sector Breadth</span><span class="rv" id="r2-breadth">—</span><div class="mini-bar"><span id="r2-bar" style="width:50%"></span></div></div>
+      <div class="rcell rcell-time"><span class="rl">Now</span><span class="rv mono" id="r2-clock">—</span></div>
+    </div>
+    <div class="sector-strip" id="sector-strip-v2"></div>
+  </section>
+
+  <!-- ============================================================
+       Row 2 — Four feature cards (radar, earnings, brief, alerts)
+       ============================================================ -->
+  <section class="card-grid">
+
+    <!-- Radar leaderboard -->
+    <div class="fcard">
+      <div class="fcard-head">
+        <span class="fcard-icon" style="background:rgba(76,201,255,0.18); color:#4cc9ff;">⏺</span>
+        <h4>Squeeze Radar — Top 5</h4>
+        <a href="/radar" class="fcard-link">View all →</a>
+      </div>
+      <div class="fcard-body" id="card-radar">
+        <div class="fcard-empty">Loading universe leaderboard…</div>
+      </div>
+    </div>
+
+    <!-- Earnings -->
+    <div class="fcard">
+      <div class="fcard-head">
+        <span class="fcard-icon" style="background:rgba(255,176,76,0.18); color:#ffb04c;">📅</span>
+        <h4>Earnings This Week — Top 5</h4>
+        <a href="/earnings" class="fcard-link">View all →</a>
+      </div>
+      <div class="fcard-body" id="card-earnings">
+        <div class="fcard-empty">Loading earnings scan…</div>
+      </div>
+    </div>
+
+    <!-- Watchlist briefs -->
+    <div class="fcard">
+      <div class="fcard-head">
+        <span class="fcard-icon" style="background:rgba(155,109,255,0.18); color:#9b6dff;">★</span>
+        <h4>Watchlist Briefs</h4>
+        <a href="/brief" class="fcard-link">View all →</a>
+      </div>
+      <div class="fcard-body" id="card-brief">
+        <div class="fcard-empty">Loading watchlist briefs…</div>
+      </div>
+    </div>
+
+    <!-- Live alerts -->
+    <div class="fcard">
+      <div class="fcard-head">
+        <span class="fcard-icon" style="background:rgba(41,216,150,0.18); color:#29d896;">⚡</span>
+        <h4>Live Alerts</h4>
+        <a href="/log" class="fcard-link">View all →</a>
+      </div>
+      <div class="fcard-body" id="card-alerts">
+        <div class="fcard-empty">Loading alerts feed…</div>
+      </div>
+    </div>
+
+  </section>
+
+</div>
+
+<style>
+  /* New compact dashboard design — focused on signal density without clutter */
+  .dash-v2 { display: flex; flex-direction: column; gap: 14px; padding: 10px 14px; }
+
+  .panel-v2 { background: rgba(11,17,26,0.6); border: 1px solid rgba(28,36,53,0.7); border-radius: 10px; padding: 10px 14px; }
+
+  .regime-strip-v2 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .regime-strip-v2 .rcell { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px; border-right: 1px solid rgba(28,36,53,0.5); }
+  .regime-strip-v2 .rcell:last-child { border-right: none; }
+  .regime-strip-v2 .rl { font-size: 10px; color: #8893a8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .regime-strip-v2 .rv { font-size: 16px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+  .regime-strip-v2 .rs { font-size: 11px; color: #8893a8; }
+  .regime-strip-v2 .mini-bar { height: 4px; background: rgba(28,36,53,0.6); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+  .regime-strip-v2 .mini-bar span { display: block; height: 100%; background: linear-gradient(90deg, #ff526f 0%, #ffb04c 50%, #29d896 100%); }
+
+  .sector-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(28,36,53,0.5); }
+  .sector-strip .schip { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 4px; background: rgba(28,36,53,0.45); }
+  .sector-strip .schip.up { color: #29d896; background: rgba(41,216,150,0.10); }
+  .sector-strip .schip.dn { color: #ff526f; background: rgba(255,82,111,0.10); }
+
+  /* Four-up card grid */
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 1100px) { .card-grid { grid-template-columns: 1fr; } }
+  .fcard { background: rgba(11,17,26,0.6); border: 1px solid rgba(28,36,53,0.7); border-radius: 10px; display: flex; flex-direction: column; min-height: 280px; }
+  .fcard-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid rgba(28,36,53,0.5); }
+  .fcard-icon { width: 26px; height: 26px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; }
+  .fcard-head h4 { margin: 0; font-size: 13px; font-weight: 600; color: #c9d3e3; flex: 1; }
+  .fcard-link { font-size: 11px; color: #4cc9ff; text-decoration: none; font-family: 'JetBrains Mono', monospace; }
+  .fcard-link:hover { text-decoration: underline; }
+  .fcard-body { padding: 10px 14px; flex: 1; overflow-y: auto; max-height: 320px; }
+  .fcard-empty { padding: 30px 0; text-align: center; color: #8893a8; font-size: 12px; }
+
+  .frow { display: grid; grid-template-columns: 60px 1fr auto; gap: 8px; padding: 6px 4px; border-bottom: 1px solid rgba(28,36,53,0.3); align-items: center; font-size: 12px; }
+  .frow:hover { background: rgba(28,36,53,0.3); }
+  .frow:last-child { border-bottom: none; }
+  .frow a { color: #fff; text-decoration: none; font-weight: 700; }
+  .frow a:hover { color: #4cc9ff; }
+  .frow .reason { color: #8893a8; font-size: 11px; font-family: 'JetBrains Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .frow .pill { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgba(76,201,255,0.14); color: #4cc9ff; font-weight: 700; }
+  .frow .pill.hot { background: rgba(255,213,64,0.18); color: #ffd540; }
+  .frow .pill.bull { background: rgba(41,216,150,0.16); color: #29d896; }
+  .frow .pill.bear { background: rgba(255,82,111,0.16); color: #ff526f; }
+  .frow .pill.neut { background: rgba(140,150,170,0.18); color: #c9d3e3; }
+</style>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+
+function dirPillClass(score) { return score>=2?'bull': score<=-2?'bear':'neut'; }
+
+function fmtPct(v) { return (v >= 0 ? '+' : '') + (v||0).toFixed(2) + '%'; }
+
+/* ---------- regime ---------- */
+async function loadRegime() {
+  try {
+    const r = await fetch('/api/regime');
+    if (!r.ok) return;
+    const d = await r.json();
+    $('r2-vix').textContent = d.vix ? d.vix.toFixed(2) : '—';
+    $('r2-regime').textContent = (d.regime||'—').toUpperCase();
+    $('r2-spy').textContent = `${(d.spy_vs_ema50_pct||0).toFixed(2)}%`;
+    $('r2-spy').style.color = (d.spy_vs_ema50_pct||0) >= 0 ? '#29d896' : '#ff526f';
+    $('r2-breadth').textContent = `${d.breadth_up}/${d.breadth_total}`;
+    $('r2-bar').style.width = (d.breadth_pct||50).toFixed(0) + '%';
+    const strip = $('sector-strip-v2');
+    strip.innerHTML = (d.sectors||[]).map(s => `
+      <span class="schip ${s.change_pct>=0?'up':'dn'}">${s.label} ${fmtPct(s.change_pct)}</span>
+    `).join('');
+  } catch (e) {}
+}
+
+/* ---------- universe radar leaderboard ---------- */
+async function loadRadar() {
+  const card = $('card-radar');
+  try {
+    const r = await fetch('/api/brief?scope=universe&limit=5');
+    if (!r.ok) throw new Error('api');
+    const d = await r.json();
+    if (!d.signals || !d.signals.length) {
+      card.innerHTML = '<div class="fcard-empty">Universe scan hasn\'t run yet — first pass takes ~30 min after startup.</div>';
+      return;
+    }
+    card.innerHTML = d.signals.slice(0, 5).map(s => `
+      <div class="frow">
+        <a href="/symbol/${s.symbol}">${s.symbol}</a>
+        <span class="reason">${s.reason||''}</span>
+        <span class="pill${s.score>=75?' hot':''}">${s.score.toFixed(0)}</span>
+      </div>
+    `).join('');
+  } catch (e) {
+    card.innerHTML = '<div class="fcard-empty">Failed to load.</div>';
+  }
+}
+
+/* ---------- earnings preview ---------- */
+async function loadEarnings() {
+  const card = $('card-earnings');
+  try {
+    const r = await fetch('/api/earnings_scan?window=week&max_symbols=40');
+    if (!r.ok) throw new Error('api');
+    const d = await r.json();
+    if (!d.rows || !d.rows.length) {
+      card.innerHTML = '<div class="fcard-empty">No earnings in window. Set FINNHUB_KEY in keys.py for full-market calendar.</div>';
+      return;
+    }
+    // Sort by combined direction conviction × radar score
+    const ranked = d.rows.slice().sort((a, b) => {
+      const va = (Math.abs(a.direction_score)/10) * (a.radar_score/100);
+      const vb = (Math.abs(b.direction_score)/10) * (b.radar_score/100);
+      return vb - va;
+    }).slice(0, 5);
+    card.innerHTML = ranked.map(r => `
+      <div class="frow">
+        <a href="/symbol/${r.symbol}">${r.symbol}</a>
+        <span class="reason">${r.date} · ±${(r.implied_move_pct||0).toFixed(1)}% IM · radar ${r.radar_score.toFixed(0)}</span>
+        <span class="pill ${dirPillClass(r.direction_score)}">${r.direction_score>0?'+':''}${r.direction_score}</span>
+      </div>
+    `).join('');
+  } catch (e) {
+    card.innerHTML = '<div class="fcard-empty">Failed to load earnings.</div>';
+  }
+}
+
+/* ---------- watchlist briefs ---------- */
+async function loadBrief() {
+  const card = $('card-brief');
+  try {
+    const r = await fetch('/api/brief?scope=watchlist&limit=10');
+    if (!r.ok) throw new Error('api');
+    const d = await r.json();
+    if (!d.briefs || !d.briefs.length) {
+      card.innerHTML = '<div class="fcard-empty">No briefs yet — engine warms up over the first 5-10 min.</div>';
+      return;
+    }
+    card.innerHTML = d.briefs.slice(0, 5).map(b => {
+      const dir = (b.direction||{}).direction || 'neutral';
+      const score = (b.radar||{}).score || 0;
+      return `
+      <div class="frow">
+        <a href="/symbol/${b.symbol}">${b.symbol}</a>
+        <span class="reason">$${(b.spot||0).toFixed(2)} · ${dir.toUpperCase()} ${((b.direction||{}).confidence*100||0).toFixed(0)}%</span>
+        <span class="pill${score>=75?' hot':''}">${score.toFixed(0)}</span>
+      </div>
+    `;}).join('');
+  } catch (e) {
+    card.innerHTML = '<div class="fcard-empty">Failed to load briefs.</div>';
+  }
+}
+
+/* ---------- recent alerts ---------- */
+async function loadAlerts() {
+  const card = $('card-alerts');
+  try {
+    const r = await fetch('/api/alerts/recent?limit=8');
+    if (!r.ok) throw new Error('api');
+    const d = await r.json();
+    if (!d.alerts || !d.alerts.length) {
+      card.innerHTML = '<div class="fcard-empty">No alerts yet — engine sweeps the universe in the background.</div>';
+      return;
+    }
+    card.innerHTML = d.alerts.slice(0, 8).map(a => `
+      <div class="frow">
+        <a href="/symbol/${a.symbol}">${a.symbol}</a>
+        <span class="reason">${a.message || ''}</span>
+        <span class="pill">${a.severity || a.scanner || ''}</span>
+      </div>
+    `).join('');
+  } catch (e) {
+    card.innerHTML = '<div class="fcard-empty">Failed to load alerts.</div>';
+  }
+}
+
+function tickClock() {
+  const d = new Date();
+  $('r2-clock').textContent = d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+loadRegime(); loadRadar(); loadEarnings(); loadBrief(); loadAlerts();
+tickClock();
+setInterval(tickClock, 1000);
+setInterval(loadRegime, 60_000);
+setInterval(loadRadar, 60_000);
+setInterval(loadEarnings, 120_000);
+setInterval(loadBrief, 60_000);
+setInterval(loadAlerts, 30_000);
+</script>
+{% endblock %}

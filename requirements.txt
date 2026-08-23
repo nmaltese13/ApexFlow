@@ -1,0 +1,21 @@
+yfinance>=0.2.40
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.11.0
+rich>=13.7.0
+click>=8.1.0
+requests>=2.31.0
+python-dateutil>=2.9.0
+pytz>=2024.1
+# Required for zoneinfo on Windows, which ships no system tz database.
+# analytics/timeutil.py resolves the real 16:00 America/New_York close
+# through zoneinfo; without this it falls back to an approximate DST
+# window that can be an hour off around the transitions.
+tzdata>=2024.1
+
+# Web app — FastAPI + Jinja
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+jinja2>=3.1.0
+python-multipart>=0.0.9
+cryptography>=42.0.0

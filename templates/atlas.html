@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %} · Atlas{% endblock %}
+{% block content %}
+
+<div class="dash">
+  <section class="panel">
+    <div class="panel-head">
+      <h3>Atlas <span class="panel-sub">intraday GEX node history · orbs grow as OI accretes</span></h3>
+    </div>
+
+    <!-- ========================  TOOLBAR  ======================== -->
+    <div class="proj-toolbar">
+      <label>Symbol
+        <input id="atl-sym" class="hs-sym-input" type="text" value="TSLA" maxlength="6">
+      </label>
+      <label>Bucket
+        <select id="atl-bucket" class="pick">
+          <option value="">All expiries</option>
+          <option value="0dte">0DTE</option>
+          <option value="wkly" selected>Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </label>
+      <label>Lookback
+        <select id="atl-hours" class="pick">
+          <option value="1">1h</option>
+          <option value="3">3h</option>
+          <option value="6.5" selected>Today</option>
+          <option value="13">2 sessions</option>
+          <option value="26">4 sessions</option>
+        </select>
+      </label>
+      <label>Mode
+        <div class="chart-mode-toggle" id="atl-mode">
+          <button class="active" data-mode="all">All snapshots</button>
+          <button data-mode="latest">Latest only</button>
+          <button data-mode="growth">Growth heat</button>
+        </div>
+      </label>
+      <button id="atl-refresh" class="btn-secondary" style="margin-left:auto">Reload</button>
+      <label class="toggle"><input type="checkbox" id="atl-auto" checked> <span>auto 30s</span></label>
+    </div>
+
+    <!-- ========================  CHART + SIDEBAR  ======================== -->
+    <div class="proj-panel">
+      <div class="proj-chart-wrap" id="atl-wrap">
+        <div class="lw-legend" id="atl-legend">
+          <div class="lw-key"><span class="lw-dot" style="background:#4cc9ff"></span><span class="lw-val mono" id="atl-spot">—</span></div>
+          <div class="lw-key"><span class="lw-dot" style="background:#29d896"></span>+ GEX node</div>
+          <div class="lw-key"><span class="lw-dot" style="background:#ff526f"></span>− GEX node</div>
+          <div class="lw-key"><span class="lw-dot" style="background:#ffd540"></span>King</div>
+          <div class="lw-key"><span class="lw-dot" style="background:#9b6dff"></span>Wall</div>
+        </div>
+        <div class="proj-chart-body" id="atl-chart-body" style="position:relative">
+          <canvas id="atl-overlay" style="position:absolute; inset:0; pointer-events:none;"></canvas>
+        </div>
+        <div class="atl-scrub" id="atl-scrub-wrap" style="padding:8px 12px; display:flex; align-items:center; gap:10px; border-top:1px solid rgba(28,36,53,0.55)">
+          <button id="atl-play" class="btn-secondary" style="min-width:60px">▶ Play</button>
+          <input id="atl-scrub" type="range" min="0" max="0" value="0" step="1" style="flex:1">
+          <span id="atl-scrub-label" class="mono" style="min-width:140px; text-align:right; color:#8893a8">—</span>
+        </div>
+      </div>
+
+      <aside class="proj-sidebar">
+        <div class="proj-sidebar-head">
+          <span class="proj-sym" id="atl-sym-label">TSLA</span>
+          <span class="proj-spot" id="atl-spot-big">—</span>
+        </div>
+        <div class="proj-stats">
+          <div class="proj-stat">
+            <div class="pl">Snapshots today</div>
+            <div class="pv mono" id="atl-snap-count">—</div>
+            <div class="ps" id="atl-snap-window">—</div>
+          </div>
+          <div class="proj-stat">
+            <div class="pl">Active strikes</div>
+            <div class="pv mono" id="atl-strike-count">—</div>
+            <div class="ps" id="atl-bucket-list">—</div>
+          </div>
+          <div class="proj-stat">
+            <div class="pl">King Node</div>
+            <div class="pv mono" id="atl-king">—</div>
+            <div class="ps" id="atl-king-sub"></div>
+          </div>
+          <div class="proj-stat">
+            <div class="pl">Top growing strike</div>
+            <div class="pv mono" id="atl-grow">—</div>
+            <div class="ps" id="atl-grow-sub"></div>
+          </div>
+        </div>
+
+        <div class="proj-table-head">Latest frame · top |GEX| strikes</div>
+        <div class="proj-table" id="atl-table">
+          <div class="pt-h">STRIKE</div><div class="pt-h">$GEX</div><div class="pt-h">OI</div><div class="pt-h">Δ%</div>
+        </div>
+        <div class="proj-foot" id="atl-foot">Loading…</div>
+      </aside>
+    </div>
+
+    <p class="panel-sub" style="margin-top:14px">
+      <strong>How to read it.</strong>
+      Each orb is one (strike, snapshot) — green = positive dealer gamma (pinning, support), red = negative
+      (volatility-amplifying, magnet to the downside). Size = √|GEX| × log(OI), so heavy strikes naturally
+      dominate without drowning out smaller nodes. As OI accumulates intraday, repeat orbs at the same strike
+      stack and brighten — that's the "growing nodes" effect. Use the scrubber to replay the session.
+    </p>
+  </section>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/atlas.js"></script>
+{% endblock %}

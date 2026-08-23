@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+
+# Local runtime data
+data/cache/
+data/signals.jsonl
+data/watchlist.json
+data/atlas.db
+data/briefings/
+data/schwab_tokens.json
+
+# data/demo/ is deliberately NOT ignored — the frozen chain snapshot is
+# committed so the terminal runs with no API key. See docs/demo_dataset.md.
+
+# Test/tooling caches
+.pytest_cache/
+pytest-cache-files-*/
+
+# Local credentials — do NOT commit your keys
+keys.py
+.env

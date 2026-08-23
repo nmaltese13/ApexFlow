@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %} · Briefing{% endblock %}
+{% block content %}
+
+<div class="dash">
+  <section class="panel">
+    <div class="panel-head">
+      <h3>Morning Briefing <span class="panel-sub">pre-computed analysis · refreshed in the background 24/7</span></h3>
+    </div>
+
+    <div class="proj-toolbar">
+      <div class="chart-mode-toggle" id="brf-scope">
+        <button class="active" data-scope="watchlist">Watchlist briefs</button>
+        <button data-scope="universe">Universe leaderboard</button>
+      </div>
+      <label>Sort
+        <select id="brf-sort" class="pick">
+          <option value="score" selected>Radar score</option>
+          <option value="direction_conf">Direction conviction</option>
+          <option value="catalyst">Days to earnings</option>
+          <option value="symbol">Symbol</option>
+        </select>
+      </label>
+      <label>Min score
+        <select id="brf-min" class="pick">
+          <option value="0" selected>All</option>
+          <option value="40">≥ 40</option>
+          <option value="60">≥ 60</option>
+          <option value="75">≥ 75</option>
+        </select>
+      </label>
+      <button id="brf-refresh" class="btn-secondary" style="margin-left:auto">Reload</button>
+      <span id="brf-status" class="panel-sub" style="margin-left:12px">loading…</span>
+    </div>
+
+    <div id="brf-grid" class="brf-grid"></div>
+  </section>
+</div>
+
+<style>
+  .brf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; margin-top: 14px; }
+  .brf-card { background: rgba(11, 17, 26, 0.6); border: 1px solid rgba(28, 36, 53, 0.7); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .brf-card.hot { border-color: rgba(255, 213, 64, 0.5); background: rgba(60, 50, 16, 0.16); }
+  .brf-head { display: flex; align-items: center; gap: 10px; }
+  .brf-sym  { font-weight: 700; font-size: 17px; min-width: 60px; }
+  .brf-sym a { color: inherit; text-decoration: none; }
+  .brf-spot { font-family: 'JetBrains Mono', monospace; color: #c9d3e3; font-size: 13px; }
+  .brf-score { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; padding: 4px 10px; border-radius: 6px; background: rgba(76, 201, 255, 0.14); color: #4cc9ff; }
+  .brf-score.hot { background: rgba(255, 213, 64, 0.18); color: #ffd540; }
+  .brf-score.cold { background: rgba(80, 90, 110, 0.20); color: #8893a8; }
+  .brf-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .brf-tag { font-size: 10px; padding: 2px 7px; border-radius: 99px; background: rgba(76, 201, 255, 0.12); color: #4cc9ff; }
+  .brf-tag.hot { background: rgba(255, 213, 64, 0.18); color: #ffd540; }
+  .brf-tag.dir-bull { background: rgba(41, 216, 150, 0.16); color: #29d896; }
+  .brf-tag.dir-bear { background: rgba(255, 82, 111, 0.16); color: #ff526f; }
+  .brf-tag.dir-neutral { background: rgba(140, 150, 170, 0.18); color: #c9d3e3; }
+  .brf-row { display: flex; gap: 10px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #c9d3e3; }
+  .brf-row span { background: rgba(28, 36, 53, 0.45); padding: 3px 8px; border-radius: 4px; }
+  .brf-row span.up { color: #29d896; }
+  .brf-row span.dn { color: #ff526f; }
+  .brf-walls { display: flex; flex-direction: column; gap: 3px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .brf-wall { display: flex; gap: 8px; align-items: center; }
+  .brf-wall .b { flex: 1; height: 6px; background: rgba(28, 36, 53, 0.6); border-radius: 3px; position: relative; overflow: hidden; }
+  .brf-wall .b div { position: absolute; top: 0; bottom: 0; left: 0; }
+  .brf-wall .b div.pos { background: #29d896; }
+  .brf-wall .b div.neg { background: #ff526f; }
+  .brf-wall .k { min-width: 50px; text-align: right; }
+  .brf-wall .v { min-width: 70px; }
+  .brf-foot { display: flex; gap: 8px; font-size: 10px; color: #8893a8; align-items: center; }
+  .brf-stale { color: #ff9a3c; }
+  .brf-empty { padding: 32px; text-align: center; color: #8893a8; }
+</style>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = id => document.getElementById(id);
+let curScope = 'watchlist';
+
+function fmtMoney(v) {
+  const a = Math.abs(v||0); const sign = v<0?'-':v>0?'+':'';
+  if (a>=1e9) return sign+'$'+(a/1e9).toFixed(1)+'B';
+  if (a>=1e6) return sign+'$'+(a/1e6).toFixed(1)+'M';
+  if (a>=1e3) return sign+'$'+(a/1e3).toFixed(0)+'K';
+  return sign+'$'+a.toFixed(0);
+}
+function fmtPct(v) { return (v>=0?'+':'')+(v||0).toFixed(2)+'%'; }
+function fmtTs(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts*1000);
+  const min = (Date.now()/1000 - ts) / 60;
+  if (min < 60) return `${Math.round(min)}m ago`;
+  if (min < 1440) return `${Math.round(min/60)}h ago`;
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+async function loadBriefs() {
+  $('brf-status').textContent = 'loading…';
+  try {
+    const r = await fetch(`/api/brief?scope=${curScope}&limit=120`);
+    if (!r.ok) throw new Error('api error');
+    const data = await r.json();
+    if (curScope === 'universe') renderUniverse(data);
+    else renderWatchlist(data);
+  } catch (e) {
+    $('brf-status').textContent = 'failed: ' + e.message;
+  }
+}
+
+function renderWatchlist(data) {
+  const briefs = data.briefs || [];
+  const minScore = parseFloat($('brf-min').value) || 0;
+  const sort = $('brf-sort').value;
+
+  let filtered = briefs.filter(b => ((b.radar||{}).score || 0) >= minScore);
+  filtered.sort((a, b) => {
+    if (sort === 'score') return ((b.radar||{}).score||0) - ((a.radar||{}).score||0);
+    if (sort === 'direction_conf') return ((b.direction||{}).confidence||0) - ((a.direction||{}).confidence||0);
+    if (sort === 'catalyst') {
+      const da = a.days_to_earnings ?? 999, db = b.days_to_earnings ?? 999;
+      return da - db;
+    }
+    if (sort === 'symbol') return a.symbol.localeCompare(b.symbol);
+    return 0;
+  });
+
+  $('brf-status').textContent = `${filtered.length} of ${briefs.length} briefs`;
+  const grid = $('brf-grid');
+  grid.innerHTML = '';
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="brf-empty">No briefs yet — engine builds them in the background. First pass takes a few minutes after startup. Drop the min-score filter or wait.</div>';
+    return;
+  }
+  filtered.forEach(b => grid.appendChild(brfCard(b)));
+}
+
+function renderUniverse(data) {
+  const sigs = data.signals || [];
+  $('brf-status').textContent = `${sigs.length} signals · scanned ${fmtTs(data.generated_at)}`;
+  const grid = $('brf-grid');
+  grid.innerHTML = '';
+  if (!sigs.length) {
+    grid.innerHTML = '<div class="brf-empty">Universe leaderboard empty — first 30-min sweep hasn\'t completed yet.</div>';
+    return;
+  }
+  sigs.forEach(s => grid.appendChild(sigCard(s)));
+}
+
+function brfCard(b) {
+  const score = (b.radar || {}).score || 0;
+  const isHot = score >= 75;
+  const card = document.createElement('div');
+  card.className = 'brf-card' + (isHot ? ' hot' : '');
+
+  const dir = b.direction || {};
+  const dirLabel = (dir.direction || 'neutral').toUpperCase();
+  const conf = (dir.confidence || 0);
+  const dirCls = dir.direction === 'bullish' ? 'dir-bull' : dir.direction === 'bearish' ? 'dir-bear' : 'dir-neutral';
+
+  const tags = (b.radar||{}).tags || [];
+  const tagsHtml = tags.map(t => `<span class="brf-tag${t==='multi-edge'?' hot':''}">${t}</span>`).join('');
+
+  const walls = (b.gamma_walls || []).slice(0, 5);
+  const maxAbs = Math.max(1, ...walls.map(w => Math.abs(w.total_gex)));
+  const wallsHtml = walls.map(w => {
+    const pct = Math.min(100, Math.abs(w.total_gex) / maxAbs * 100);
+    const cls = w.total_gex >= 0 ? 'pos' : 'neg';
+    return `<div class="brf-wall">
+      <span class="k">${w.strike.toFixed(w.strike%1?2:0)}</span>
+      <div class="b"><div class="${cls}" style="width:${pct.toFixed(0)}%"></div></div>
+      <span class="v ${cls==='pos'?'up':'dn'}">${fmtMoney(w.total_gex)}</span>
+    </div>`;
+  }).join('');
+
+  const earn = b.next_earnings ? `${b.next_earnings} (${b.days_to_earnings}d)` : '—';
+  const em = b.em_1d_pct ? `±${b.em_1d_pct.toFixed(1)}%` : '—';
+
+  card.innerHTML = `
+    <div class="brf-head">
+      <span class="brf-sym"><a href="/symbol/${b.symbol}">${b.symbol}</a></span>
+      <span class="brf-spot">$${(b.spot||0).toFixed(2)}</span>
+      <span class="${(b.change_pct_5d||0)>=0?'up':'dn'}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${fmtPct(b.change_pct_5d||0)}/5d</span>
+      <span class="brf-score${isHot?' hot':score<40?' cold':''}">${score.toFixed(0)}</span>
+    </div>
+    <div class="brf-tags">
+      <span class="brf-tag ${dirCls}">${dirLabel} ${(conf*100).toFixed(0)}%</span>
+      ${tagsHtml}
+    </div>
+    <div class="brf-row">
+      <span>EM 1d ${em}</span>
+      <span>ATM IV ${((b.atm_iv||0)*100).toFixed(0)}%</span>
+      <span>Earnings ${earn}</span>
+      ${b.gamma_flip ? `<span>Flip $${b.gamma_flip.toFixed(2)}</span>` : ''}
+    </div>
+    <div class="brf-walls">${wallsHtml || '<span class="brf-empty">no chain</span>'}</div>
+    <div class="brf-foot">
+      <span>Updated ${fmtTs(b.generated_at)}</span>
+      <span style="margin-left:auto"><a href="/atlas?sym=${b.symbol}" style="color:#4cc9ff;text-decoration:none">→ Atlas</a></span>
+      <span><a href="/symbol/${b.symbol}" style="color:#4cc9ff;text-decoration:none">→ Chart</a></span>
+    </div>
+  `;
+  return card;
+}
+
+function sigCard(s) {
+  const isHot = s.score >= 75;
+  const card = document.createElement('div');
+  card.className = 'brf-card' + (isHot ? ' hot' : '');
+  const tags = (s.tags || []).map(t => `<span class="brf-tag${t==='multi-edge'?' hot':''}">${t}</span>`).join('');
+  const layers = s.metrics?.layer_scores || {};
+  const lyrs = ['short','gex','compression','rvol','catalyst','trend'].map(k => {
+    const v = Math.round(layers[k] || 0);
+    return `<span class="${v>=60?'up':''}">${k.slice(0,4)}: ${v}</span>`;
+  }).join('');
+  card.innerHTML = `
+    <div class="brf-head">
+      <span class="brf-sym"><a href="/symbol/${s.symbol}">${s.symbol}</a></span>
+      <span class="brf-score${isHot?' hot':''}">${s.score.toFixed(0)}</span>
+    </div>
+    <div class="brf-tags">${tags}</div>
+    <div class="brf-row">${lyrs}</div>
+    <div class="brf-foot">
+      <span>${s.reason||''}</span>
+      <span style="margin-left:auto"><a href="/atlas?sym=${s.symbol}" style="color:#4cc9ff;text-decoration:none">→ Atlas</a></span>
+    </div>
+  `;
+  return card;
+}
+
+document.querySelectorAll('#brf-scope button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#brf-scope button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    curScope = b.dataset.scope;
+    loadBriefs();
+  });
+});
+$('brf-sort').addEventListener('change', loadBriefs);
+$('brf-min').addEventListener('change', loadBriefs);
+$('brf-refresh').addEventListener('click', loadBriefs);
+
+loadBriefs();
+setInterval(loadBriefs, 60_000);
+</script>
+{% endblock %}
