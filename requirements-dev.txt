@@ -1,0 +1,10 @@
+# Development and CI dependencies. Not needed to run the terminal.
+-r requirements.txt
+
+# Test runner.
+pytest>=8.0.0
+
+# Required by starlette.testclient, which scripts/smoke_test.py uses to
+# exercise every route in-process. FastAPI itself does not need it at
+# runtime, which is why it lives here rather than in requirements.txt.
+httpx>=0.27.0
