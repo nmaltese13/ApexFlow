@@ -11,6 +11,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
+import pandas as pd
+
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
@@ -91,50 +93,56 @@ def _base_ctx(request: Request) -> dict:
 
 @app.get("/")
 def page_dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html",
+    return templates.TemplateResponse(request, "dashboard.html",
         {**_base_ctx(request), "page": "dashboard"})
 
 
 @app.get("/heatmap")
 def page_heatmap(request: Request):
-    return templates.TemplateResponse("heatmap.html",
+    return templates.TemplateResponse(request, "heatmap.html",
         {**_base_ctx(request), "page": "heatmap"})
 
 
 @app.get("/heatseeker")
 def page_heatseeker(request: Request):
-    return templates.TemplateResponse("heatseeker.html",
+    return templates.TemplateResponse(request, "heatseeker.html",
         {**_base_ctx(request), "page": "heatseeker"})
+
+
+@app.get("/atlas")
+def page_atlas(request: Request):
+    return templates.TemplateResponse(request, "atlas.html",
+        {**_base_ctx(request), "page": "atlas"})
 
 
 @app.get("/radar")
 def page_radar(request: Request):
-    return templates.TemplateResponse("radar.html",
+    return templates.TemplateResponse(request, "radar.html",
         {**_base_ctx(request), "page": "radar"})
 
 
 @app.get("/brief")
 def page_brief(request: Request):
-    return templates.TemplateResponse("brief.html",
+    return templates.TemplateResponse(request, "brief.html",
         {**_base_ctx(request), "page": "brief"})
 
 
 @app.get("/earnings")
 def page_earnings(request: Request):
-    return templates.TemplateResponse("earnings.html",
+    return templates.TemplateResponse(request, "earnings.html",
         {**_base_ctx(request), "page": "earnings"})
 
 
 @app.get("/guide")
 def page_guide(request: Request):
-    return templates.TemplateResponse("guide.html",
+    return templates.TemplateResponse(request, "guide.html",
         {**_base_ctx(request), "page": "guide"})
 
 
 @app.get("/watchlist")
 def page_watchlist(request: Request):
     wl = Watchlist().list()
-    return templates.TemplateResponse("watchlist.html",
+    return templates.TemplateResponse(request, "watchlist.html",
         {**_base_ctx(request), "page": "watchlist", "entries": wl})
 
 
@@ -142,20 +150,20 @@ def page_watchlist(request: Request):
 def page_log(request: Request):
     sl = SignalLogger()
     records = list(sl.iter_recent(200))
-    return templates.TemplateResponse("log.html",
+    return templates.TemplateResponse(request, "log.html",
         {**_base_ctx(request), "page": "log", "records": records[::-1]})
 
 
 @app.get("/symbol/{sym}")
 def page_symbol(request: Request, sym: str):
-    return templates.TemplateResponse("symbol.html",
+    return templates.TemplateResponse(request, "symbol.html",
         {**_base_ctx(request), "page": "symbol", "symbol": sym.upper()})
 
 
 @app.get("/backtest")
 def page_backtest(request: Request):
     from apexflow.platform.backtest import SUPPORTED_SCANNERS, UNSUPPORTED_REASON
-    return templates.TemplateResponse("backtest.html",
+    return templates.TemplateResponse(request, "backtest.html",
         {**_base_ctx(request), "page": "backtest",
          # Only offer what can actually be replayed; listing the rest just
          # invites an error the user cannot do anything about.
@@ -384,6 +392,113 @@ def api_iv_surface(sym: str, max_expiries: int = 8):
             "skew": skew,
         }
     return cached(f"ivs:{sym}:{max_expiries}", ttl=180, fetch=fetch)
+
+
+@app.get("/api/atlas/{sym}")
+def api_atlas(sym: str, hours: float = 6.5, bucket: str | None = None,
+              max_frames: int = 120):
+    """Intraday GEX node history for the Atlas replay view.
+
+    Reads the snapshots the AtlasLoop has captured into `data/atlas.db` and
+    returns them as a time-ordered list of frames, each holding the
+    per-strike node metrics at that instant.
+
+    Returns an empty `frames` list rather than an error when nothing has been
+    captured yet — Atlas needs the background loop to have been running, and
+    a brand-new install legitimately has no history. `capture_hint` says so,
+    so the page can explain itself instead of looking broken.
+    """
+    sym = sym.upper()
+
+    def fetch():
+        from apexflow.analytics.atlas import (
+            AtlasStore, compute_node_metrics, session_summary)
+
+        store = AtlasStore()
+        latest = store.latest_ts(sym)
+        empty = {
+            "symbol": sym, "spot": 0.0, "frames": [], "intraday_candles": [],
+            "session": session_summary(None), "bucket": bucket,
+            "generated_at": int(datetime.now(timezone.utc).timestamp()),
+            "capture_hint": (
+                "No Atlas snapshots for this symbol yet. The AtlasLoop "
+                "captures them during and around market hours; give it "
+                "30+ minutes of session time, and check that "
+                "APEXFLOW_ATLAS_DISABLE is not set."),
+        }
+        if latest is None:
+            return empty
+
+        from_ts = int(latest - hours * 3600)
+        df = store.read_range(sym, from_ts, latest, bucket=bucket)
+        if df is None or df.empty:
+            return empty
+
+        spot = float(pd.to_numeric(df["spot"], errors="coerce").dropna().iloc[-1]) \
+            if "spot" in df.columns and df["spot"].notna().any() else 0.0
+
+        nodes = compute_node_metrics(df, spot=spot or None)
+
+        # Group into frames. Thinning keeps the scrubber responsive on a long
+        # session without dropping the most recent state, which is the one
+        # the page opens on.
+        stamps = sorted(nodes["ts"].unique().tolist())
+        if len(stamps) > max_frames:
+            step = len(stamps) / max_frames
+            keep = {stamps[min(int(i * step), len(stamps) - 1)] for i in range(max_frames)}
+            keep.add(stamps[-1])
+            stamps = sorted(keep)
+
+        frames = []
+        for ts in stamps:
+            block = nodes[nodes["ts"] == ts]
+            frames.append({
+                "ts": int(ts),
+                "strikes": [
+                    {k: (None if pd.isna(v) else
+                         (bool(v) if isinstance(v, (bool,)) else
+                          float(v) if isinstance(v, (int, float)) else v))
+                     for k, v in row.items() if k != "ts"}
+                    for row in block.to_dict(orient="records")
+                ],
+            })
+
+        candles = []
+        try:
+            hist = get_provider().history(sym, period="5d", interval="5m")
+            if hist is not None and not hist.empty:
+                recent = hist[hist.index >= pd.Timestamp(from_ts, unit="s", tz="UTC")]
+                for idx, row in recent.iterrows():
+                    candles.append({
+                        "t": int(pd.Timestamp(idx).timestamp()),
+                        "o": float(row["Open"]), "h": float(row["High"]),
+                        "l": float(row["Low"]), "c": float(row["Close"]),
+                    })
+        except Exception as e:
+            log.warning("atlas candles failed for %s: %s", sym, e)
+
+        return {
+            "symbol": sym,
+            "spot": spot,
+            "bucket": bucket,
+            "frames": frames,
+            "intraday_candles": candles,
+            "session": session_summary(df),
+            "generated_at": int(datetime.now(timezone.utc).timestamp()),
+        }
+
+    return cached(f"atlas:{sym}:{hours}:{bucket}:{max_frames}", ttl=30, fetch=fetch)
+
+
+@app.get("/api/atlas_symbols")
+def api_atlas_symbols():
+    """Symbols that currently have captured Atlas history."""
+    from apexflow.analytics.atlas import AtlasStore
+    try:
+        return {"symbols": AtlasStore().symbols()}
+    except Exception as e:
+        log.warning("atlas symbols failed: %s", e)
+        return {"symbols": []}
 
 
 @app.get("/api/dealer_greeks/{sym}")

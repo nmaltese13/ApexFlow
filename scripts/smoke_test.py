@@ -29,8 +29,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 import webapp  # noqa: E402
 
 PAGES = [
-    "/", "/heatmap", "/heatseeker", "/radar", "/brief", "/earnings",
-    "/guide", "/watchlist", "/log", "/backtest", "/symbol/SPY",
+    "/", "/heatmap", "/heatseeker", "/atlas", "/radar", "/brief",
+    "/earnings", "/guide", "/watchlist", "/log", "/backtest", "/symbol/SPY",
 ]
 
 API = [
@@ -54,6 +54,10 @@ API = [
     "/api/iv_surface/NVDA",
     "/api/mc/validate?paths=20000&steps=32",
     "/api/heatseeker?symbols=SPY,QQQ",
+    # Atlas returns an empty frame list on a fresh clone (no captured
+    # history yet) — a 200 with a capture_hint, not an error.
+    "/api/atlas/SPY",
+    "/api/atlas_symbols",
     "/api/earnings_direction/NVDA",
     "/api/watchlist",
     "/api/log",
