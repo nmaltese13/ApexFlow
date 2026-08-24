@@ -65,6 +65,15 @@ def demo_dataset_present() -> bool:
     return (DEMO_DIR / "manifest.json").exists()
 
 
+# ---- Free options feed ------------------------------------------------------
+# Cboe publishes delayed option quotes as JSON with exchange-computed IV and
+# Greeks, no key and no meaningful rate limit. It is strictly better than
+# yfinance for options, so it is the default free source. Set
+# APEXFLOW_DISABLE_CBOE=1 to fall back to yfinance (useful if the endpoint
+# changes or you are offline behind a proxy that blocks it).
+CBOE_ENABLED = os.environ.get("APEXFLOW_DISABLE_CBOE", "").lower() not in ("1", "true", "yes", "on")
+
+
 # ---- Universe defaults ------------------------------------------------------
 DEFAULT_UNIVERSE = os.environ.get("APEXFLOW_UNIVERSE", "sp100")
 
@@ -110,6 +119,7 @@ def configured_providers() -> dict[str, bool]:
         "Schwab (price + options + greeks)":  schwab_ready,
         "Polygon (price + options)":          bool(POLYGON_KEY),
         "MarketData.app (chain fallback)":    bool(MARKETDATA_TOKEN),
+        "Cboe delayed chains (free, no key)":  CBOE_ENABLED,
         "Unusual Whales (flow + dark pool)":  bool(UNUSUAL_WHALES_KEY),
         "Fintel (short interest / squeeze)":  bool(FINTEL_KEY),
         "Finnhub (news + earnings)":          bool(FINNHUB_KEY),
@@ -126,4 +136,6 @@ def primary_provider_name() -> str:
         return "polygon"
     if MARKETDATA_TOKEN:
         return "marketdata"
+    if CBOE_ENABLED:
+        return "cboe"
     return "yfinance"

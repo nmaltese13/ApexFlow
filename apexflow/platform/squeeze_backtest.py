@@ -54,8 +54,38 @@ question is whether the score **ranks** outcomes, so the harness computes:
   each date, many times over. Reported as a percentile, so an IC of 0.04
   can be seen for what it is against the spread of ICs pure noise produces
   at this sample size.
-* **Decile means** — average forward return by score bucket, to see whether
-  any relationship is monotone or driven by one extreme bucket.
+* **Decile means and medians** — forward return by score bucket, to see
+  whether any relationship is monotone or driven by one extreme bucket.
+* **Tail metrics** — see below. Rank IC alone is the wrong lens for this
+  particular model, and finding that out was the point of running it.
+
+Why rank IC is not sufficient here
+----------------------------------
+Rank IC asks whether higher-scored names *typically* outperform. That is
+the right question for a factor expected to shift the whole distribution.
+It is the wrong question for a squeeze model, and the data says so plainly.
+
+On the high-short-interest universe the top score decile came back with a
+mean 10-day forward return of **+14.5%** and a median of **-1.6%**. Both
+numbers are correct. Most high-scored names drift down; a few move
+violently up and carry the average on their own. A rank correlation, which
+is driven by typical ordering, reads that as *negative* information —
+while an equal-weighted holder of that bucket would have made money.
+
+That is not a flaw in the data, it is the actual shape of squeeze payoffs:
+rare, violent, right-tailed. So the harness reports tail statistics
+alongside the rank statistics, and flags the divergence explicitly rather
+than letting one summary number hide it:
+
+* ``tail_rate`` — share of observations in a bucket exceeding a large
+  move threshold (default +20%).
+* ``p90`` per bucket — the ninetieth percentile outcome.
+* ``tail_signature`` — set when the top bucket's mean and median disagree
+  in sign, the fingerprint of a lottery-ticket payoff.
+
+Neither framing is privileged. A model can be genuinely useful for tail
+exposure and genuinely useless for ranking, and those are different claims
+about different uses.
 
 Overlapping windows, and why both tests use the same subsample
 ---------------------------------------------------------------
@@ -105,8 +135,9 @@ from apexflow.analytics.squeeze import SqueezeInputs, squeeze_score, COMPONENT_M
 log = logging.getLogger(__name__)
 
 __all__ = [
-    "PointInTimeSource", "PriceDerivedSource", "SqueezeBacktestReport",
-    "SqueezeBacktester", "TOTAL_POINTS", "MIN_MEANINGFUL_COVERAGE",
+    "PointInTimeSource", "PriceDerivedSource", "HistoricalShortInterestSource",
+    "SqueezeBacktestReport", "SqueezeBacktester", "TOTAL_POINTS",
+    "MIN_MEANINGFUL_COVERAGE", "TAIL_THRESHOLD_PCT",
 ]
 
 TOTAL_POINTS = sum(COMPONENT_MAX.values())
@@ -119,6 +150,11 @@ MIN_MEANINGFUL_COVERAGE = 0.50
 #: Minimum names per date for a cross-sectional rank correlation to carry
 #: any information. Spearman on 5 points is noise with a decimal place.
 MIN_BREADTH = 15
+
+#: Forward return (%) counted as a "large move" for the tail statistics.
+#: 20% over a two-week hold is well outside normal drift for a liquid name,
+#: and is roughly the scale of move a squeeze thesis is actually about.
+TAIL_THRESHOLD_PCT = 20.0
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +291,13 @@ class SqueezeBacktestReport:
 
     decile_returns: list[dict] = field(default_factory=list)
     top_minus_bottom: float = 0.0
+    #: Fraction of the top bucket exceeding TAIL_THRESHOLD, and of the bottom.
+    top_tail_rate: float = 0.0
+    bottom_tail_rate: float = 0.0
+    tail_ratio: float = 0.0          # top_tail_rate / bottom_tail_rate
+    #: True when the top bucket's mean and median disagree in sign — the
+    #: lottery-ticket fingerprint that a rank statistic cannot see.
+    tail_signature: bool = False
 
     conclusive: bool = False
     verdict: str = ""
@@ -280,6 +323,10 @@ class SqueezeBacktestReport:
             "null_ic_std": self.null_ic_std,
             "decile_returns": self.decile_returns,
             "top_minus_bottom": self.top_minus_bottom,
+            "top_tail_rate": self.top_tail_rate,
+            "bottom_tail_rate": self.bottom_tail_rate,
+            "tail_ratio": self.tail_ratio,
+            "tail_signature": self.tail_signature,
             "conclusive": self.conclusive,
             "verdict": self.verdict,
             "caveats": self.caveats,
@@ -341,6 +388,10 @@ class SqueezeBacktester:
                 try:
                     inputs = self.source.inputs_at(sym, df.index[i], window)
                     score, _ = squeeze_score(inputs)
+                except _NoShortInterest:
+                    # Expected and frequent near the start of a history —
+                    # the date simply predates the first publication.
+                    continue
                 except Exception as e:
                     log.debug("scoring failed %s@%s: %s", sym, df.index[i], e)
                     continue
@@ -455,6 +506,14 @@ class SqueezeBacktester:
 
         # --- decile table -----------------------------------------------
         rep.decile_returns, rep.top_minus_bottom = _bucket_table(panel, n_buckets)
+        if len(rep.decile_returns) >= 2:
+            top, bottom = rep.decile_returns[-1], rep.decile_returns[0]
+            rep.top_tail_rate = top["tail_rate"]
+            rep.bottom_tail_rate = bottom["tail_rate"]
+            rep.tail_ratio = (top["tail_rate"] / bottom["tail_rate"]
+                              if bottom["tail_rate"] > 0 else float("inf")
+                              if top["tail_rate"] > 0 else 0.0)
+            rep.tail_signature = (top["mean_return"] > 0 > top["median_return"])
 
         # --- verdict -----------------------------------------------------
         rep.conclusive, rep.verdict, rep.caveats = _judge(rep)
@@ -532,12 +591,18 @@ def _bucket_table(panel: pd.DataFrame, n_buckets: int) -> tuple[list[dict], floa
 
     rows = []
     for b, grp in df.groupby("bucket"):
+        rets = grp["fwd_return"]
         rows.append({
             "bucket": int(b) + 1,
             "n": int(len(grp)),
             "mean_score": float(grp["score"].mean()),
-            "mean_return": float(grp["fwd_return"].mean()),
-            "median_return": float(grp["fwd_return"].median()),
+            "mean_return": float(rets.mean()),
+            "median_return": float(rets.median()),
+            "p90_return": float(rets.quantile(0.90)),
+            # Share of the bucket that produced a large move. This is the
+            # statistic a squeeze model should be judged on, and the one a
+            # rank correlation is structurally blind to.
+            "tail_rate": float((rets > TAIL_THRESHOLD_PCT).mean()),
         })
     rows.sort(key=lambda r: r["bucket"])
     tmb = (rows[-1]["mean_return"] - rows[0]["mean_return"]) if len(rows) >= 2 else 0.0
@@ -585,12 +650,125 @@ def _judge(rep: SqueezeBacktestReport) -> tuple[bool, str, list[str]]:
         return False, "cross-section too narrow to rank", caveats
 
     # Two-sided read against the permutation null.
+    if rep.tail_signature:
+        caveats.append(
+            f"top bucket mean {rep.decile_returns[-1]['mean_return']:+.2f}% vs "
+            f"median {rep.decile_returns[-1]['median_return']:+.2f}% — a "
+            f"right-tailed payoff that rank statistics cannot represent")
+
     extreme = rep.null_percentile > 97.5 or rep.null_percentile < 2.5
     if not extreme:
-        return True, ("no detectable rank information — the observed IC sits "
-                      f"at the {rep.null_percentile:.1f}th percentile of the "
-                      "shuffled null, i.e. within noise"), caveats
+        base = ("no detectable rank information — the observed IC sits "
+                f"at the {rep.null_percentile:.1f}th percentile of the "
+                "shuffled null, i.e. within noise")
+        if rep.tail_signature:
+            base += (f". Note the tail statistics disagree: the top bucket's "
+                     f"large-move rate is {rep.top_tail_rate:.1%} against "
+                     f"{rep.bottom_tail_rate:.1%} in the bottom, so the score "
+                     f"may carry tail information while carrying no rank "
+                     f"information. Those are different claims")
+        return True, base, caveats
     direction = "positive" if rep.rank_ic > 0 else "negative"
     return True, (f"{direction} rank information detected "
                   f"({rep.null_percentile:.1f}th percentile of null); "
                   "treat as provisional until replicated out of sample"), caveats
+
+
+# ---------------------------------------------------------------------------
+# Point-in-time source backed by FINRA + SEC EDGAR
+# ---------------------------------------------------------------------------
+@dataclass
+class HistoricalShortInterestSource:
+    """The source that makes this backtest mean something.
+
+    Adds the two axes ``PriceDerivedSource`` had to leave empty, using data
+    that was genuinely public on the signal date:
+
+    * **days to cover** and **shares short** from FINRA's twice-monthly
+      consolidated short interest, filtered on *publication* date rather
+      than settlement date, so the eight-business-day dissemination lag is
+      respected;
+    * **shares outstanding** from SEC EDGAR XBRL, filtered on the date the
+      filing was made.
+
+    Coverage goes from 18% to about 75% — past the threshold at which the
+    harness will report a verdict at all.
+
+    Two honest caveats, both carried in the docs rather than smoothed over:
+
+    * Short interest is *bi-monthly*. Between publications the figure is
+      stale by up to three weeks, which is a real limitation of the only
+      free source that exists, not a modelling choice.
+    * EDGAR gives shares **outstanding**, not float. Float is smaller, so
+      short percentage is understated — conservative, but not the
+      conventional number.
+
+    ``borrow_rate`` and ``float_size`` stay empty: borrow is genuinely
+    paid-only, and a true free float is not published anywhere free.
+    """
+
+    price_source: PriceDerivedSource = field(default_factory=PriceDerivedSource)
+    client: object | None = None
+    #: Skip dates with no published short interest yet, rather than scoring
+    #: them as zero pressure — a missing figure is not a low figure.
+    require_short_interest: bool = True
+
+    def __post_init__(self) -> None:
+        if self.client is None:
+            from apexflow.providers.shortinterest_provider import ShortInterestClient
+            self.client = ShortInterestClient()
+        self._hist: dict[str, object] = {}
+
+    @property
+    def covers(self) -> frozenset[str]:
+        return frozenset(self.price_source.covers) | {"short_float", "days_to_cover"}
+
+    @property
+    def coverage(self) -> float:
+        return sum(COMPONENT_MAX[a] for a in self.covers) / TOTAL_POINTS
+
+    @property
+    def missing(self) -> list[str]:
+        return sorted(set(COMPONENT_MAX) - self.covers)
+
+    def _history(self, symbol: str):
+        if symbol not in self._hist:
+            self._hist[symbol] = self.client.history(symbol)
+        return self._hist[symbol]
+
+    def warm(self, symbols: Sequence[str], progress: bool = False) -> dict[str, int]:
+        """Pre-fetch the universe so the sweep itself does no network I/O."""
+        return self.client.warm(list(symbols), progress=progress)
+
+    def inputs_at(self, symbol: str, as_of, history: pd.DataFrame) -> SqueezeInputs:
+        base = self.price_source.inputs_at(symbol, as_of, history)
+        try:
+            hist = self._history(symbol)
+        except Exception as e:
+            log.debug("short interest unavailable for %s: %s", symbol, e)
+            return base
+
+        when = pd.Timestamp(as_of).date()
+        rec = hist.as_of(when)
+        if rec is None:
+            # Nothing published as of this date. Leaving the axes at zero
+            # would score the name as "no short pressure", which is a
+            # statement the data does not support.
+            if self.require_short_interest:
+                raise _NoShortInterest(symbol, when)
+            return base
+
+        base.days_to_cover = float(rec.days_to_cover or 0.0)
+        pct = hist.short_pct_as_of(when)
+        if pct is not None:
+            base.short_pct_float = float(pct)
+        return base
+
+
+class _NoShortInterest(Exception):
+    """Raised to skip a (symbol, date) with no published short interest."""
+
+    def __init__(self, symbol: str, when):
+        super().__init__(f"no short interest published for {symbol} as of {when}")
+        self.symbol = symbol
+        self.when = when

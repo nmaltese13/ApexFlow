@@ -23,6 +23,9 @@ pip install -r requirements.txt
 python main.py --demo web          # → http://localhost:8501
 ```
 
+Drop `--demo` for live data. With no API key at all it uses **Cboe** —
+exchange-computed IV and Greeks, the whole chain in one keyless request.
+
 7,665 real contracts across SPY, QQQ, IWM, NVDA, TSLA, AAPL, AMD and GME.
 No key, no network, no rate limit. Details in
 [`docs/demo_dataset.md`](docs/demo_dataset.md).
@@ -76,13 +79,16 @@ on the page. `iv_surface.py` filters by relative spread, pools both sides,
 takes a vega-weighted median, and returns a quality flag rather than a
 confident-looking number. [§6](docs/methodology.md#6-implied-volatility-extraction).
 
-**The squeeze scorer is untested, and the reason is specific.** Backtesting
-it needs point-in-time short interest, days-to-cover, borrow rate and float —
-80 of its 100 points. Free data exposes only *current* values, and scoring a
-past date with them is lookahead bias that biases the result upward. The
-harness exists, is validated against planted signals, and **refuses a verdict
-below 50% coverage**. On the 18% that is testable: rank IC +0.0105, t = +0.38,
-63rd percentile of the permutation null — nothing.
+**The squeeze scorer was backtested, and the result is not what a rank
+statistic sees.** Point-in-time short interest is free after all — FINRA
+twice-monthly (filtered on *publication* date, not settlement, so the
+8-business-day lag is respected) plus SEC EDGAR share counts filtered on
+their `filed` date. That lifts coverage from 18% to 68%. Over 15,639
+observations on high-short-interest names: rank IC −0.049, indistinguishable
+from noise. But the top decile's **mean is +14.5% while its median is
+−1.6%**, and the share of names moving >20% rises monotonically from 7.2%
+to 13.0% across deciles. Most high-scored names drift down; a few explode.
+No evidence as a ranking model; suggestive as a tail-exposure filter.
 [§10](docs/methodology.md#10-does-the-squeeze-score-work).
 
 ---
@@ -169,15 +175,19 @@ materialise, they stream into per-step histograms and counters.
 
 ## Data providers
 
-Selection order: **demo → Schwab → Polygon → MarketData.app → yfinance**.
-Demo is checked first so that when it's on, nothing reaches the network.
+Selection order: **demo → Schwab → Polygon → MarketData.app → Cboe →
+yfinance**. Demo is checked first so that when it's on, nothing reaches the
+network; Cboe outranks yfinance because it is better on every axis that
+matters and needs no key.
 
 Keys go in `keys.py` (copy `keys.example.py`). `python main.py status` shows
 what's configured and which provider is active.
 
 | Key | Cost | Notes |
 |---|---|---|
-| *(none)* | **Free** | Demo snapshot, or live yfinance — delayed, rate-limited |
+| *(none)* | **Free** | **Cboe** delayed chains — exchange-computed IV + Greeks, all expiries in one request, no key. The default. |
+| *(none)* | **Free** | Demo snapshot (offline), or yfinance as last-resort fallback |
+| `APEXFLOW_SEC_USER_AGENT` | **Free** | Your name + email. Unlocks SEC share counts for the point-in-time backtest. FINRA needs nothing. |
 | `SCHWAB_APP_KEY` + `SECRET` | **Free** with a Schwab brokerage account | Real-time chains with Greeks. Run `python main.py schwab-auth` once. |
 | `POLYGON_KEY` | ~$29/mo | Real-time options chains + IV + Greeks |
 | `MARKETDATA_TOKEN` | Free 100/day, ~$15–30/mo | Cheap fallback with Greeks |
@@ -206,13 +216,15 @@ actually fixes: [`docs/data_sources.md`](docs/data_sources.md).
 | `python main.py scan radar` | Run a scanner |
 | `python main.py hub --once` | Run all scanners once |
 | `python main.py backtest pre-breakout --hold 5` | Backtest a price-based scanner |
-| `python main.py backtest-squeeze --limit 60` | Test whether the squeeze score ranks forward returns |
+| `python main.py backtest-squeeze --universe squeeze` | Point-in-time backtest of the squeeze score (FINRA + SEC) |
 
 ## Environment toggles
 
 | Var | Effect |
 |---|---|
 | `APEXFLOW_DEMO=1` | Use the frozen snapshot (same as `--demo`) |
+| `APEXFLOW_SEC_USER_AGENT` | `"Your Name you@example.com"` — required by the SEC for share counts |
+| `APEXFLOW_DISABLE_CBOE=1` | Fall back to yfinance for options |
 | `APEXFLOW_DEMO_SHIFT=0` | Show raw captured dates instead of shifting them forward |
 | `APEXFLOW_ATLAS_DISABLE=1` | Skip the Atlas snapshot loop |
 | `APEXFLOW_BRIEFING_DISABLE=1` | Skip the briefing engine |
@@ -262,8 +274,8 @@ apexflow/
                  gex, gex_profile, timeutil, squeeze, atlas, levels, ...
   platform/      atlas_loop, briefing, live_alerts, scanner_hub,
                  backtest, squeeze_backtest
-  providers/     demo, schwab, polygon, marketdata, tradier, yfinance,
-                 unusual_whales, fintel, finnhub
+  providers/     demo, cboe, shortinterest (FINRA+SEC), schwab, polygon,
+                 marketdata, tradier, yfinance, unusual_whales, fintel, finnhub
   scanners/      squeeze_radar, earnings_*, momentum_ignition, options_flow
   ui/            terminal UI
 scripts/         capture_demo_dataset.py

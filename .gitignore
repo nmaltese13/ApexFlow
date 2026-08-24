@@ -3,6 +3,8 @@ __pycache__/
 *.pyo
 
 # Local runtime data
+# Derived caches, including the FINRA/SEC short-interest store that
+# `backtest-squeeze` warms. Regenerated on demand; goes stale.
 data/cache/
 data/signals.jsonl
 data/watchlist.json

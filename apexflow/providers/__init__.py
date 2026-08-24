@@ -2,7 +2,8 @@
 
 Architecture:
   - get_provider()       → main price/options data
-                            priority: demo > Schwab > Polygon > MarketData.app > yfinance
+                            priority: demo > Schwab > Polygon > MarketData.app
+                                      > Cboe > yfinance
   - get_flow_client()    → Unusual Whales (real flow + dark pool, optional)
   - get_squeeze_client() → Fintel (short interest, optional)
   - get_news_client()    → Finnhub (news + earnings, optional)
@@ -79,7 +80,18 @@ def _build_primary() -> DataProvider:
         except Exception as e:
             log.warning("MarketData init failed: %s — falling back", e)
 
-    # 4. yfinance — always available
+    # 4. Cboe — free, no key, exchange-computed IV and Greeks, whole chain
+    #    in one request. Strictly better than yfinance for options, so it is
+    #    the default when no paid key is present.
+    if config.CBOE_ENABLED:
+        try:
+            from .cboe_provider import CboeProvider
+            log.info("Provider: Cboe (free delayed chains with exchange Greeks)")
+            return CboeProvider()
+        except Exception as e:
+            log.warning("Cboe init failed: %s — falling back", e)
+
+    # 5. yfinance — always available
     log.info("Provider: yfinance (free fallback)")
     return YFinanceProvider()
 

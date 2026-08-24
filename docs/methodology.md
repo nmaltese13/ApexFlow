@@ -584,104 +584,120 @@ recommendation, and all invert with the section-2 convention.
 
 `platform/squeeze_backtest.py`, `python main.py backtest-squeeze`.
 
-The honest answer is **not known, and not knowable from free data** — but
-the reason is specific enough to be worth stating precisely, and the harness
-that would answer it is built and tested.
+**Short answer: not as a ranking model, but it does concentrate tail
+outcomes — and those are different claims.**
 
-### The obstacle
+### Getting the data to ask the question at all
 
-Backtesting the scorer means reconstructing all seven inputs *as they were
-known on each signal date*. Most cannot be:
+An earlier version of this document said the question was unanswerable on
+free data, because four of the seven axes were only available as *current*
+values and scoring a past date with them is lookahead bias. Two of the four
+turn out to be free after all:
 
-| Axis | Point-in-time on free data? | Max points |
-|---|---|---:|
-| Relative volume | yes, from volume history | 12 |
-| Accumulation | yes, from OBV/price history | 8 |
-| IV / HV ratio | no real IV history; proxy only | 10 |
-| **Short % of float** | **no** — only the current value | **35** |
-| **Days to cover** | **no** — only the current value | **20** |
-| **Borrow rate** | **no** — paid, current only | **15** |
-| **Float size** | **no** — only the current value | **10** |
+| Source | Provides | Cost |
+|---|---|---|
+| **FINRA** consolidated short interest | shares short, ADV, days-to-cover, twice monthly back to 2020 | free, no key |
+| **SEC EDGAR** XBRL | shares outstanding, stamped with the **filed** date | free, contact email in User-Agent |
 
-The unavailable axes are **80 of the 100 points**, and they are precisely
-the ones carrying the short-squeeze thesis. yfinance exposes a single
-current `shortPercentOfFloat`; using it to score a date eight months ago is
-lookahead bias of the purest kind, and it would bias the result *upward*,
-because today's short interest partly reflects the move being predicted.
+That lifts point-in-time coverage from 18% to **68%**, past the threshold at
+which the harness will report anything.
 
-So `PriceDerivedSource` fills in only what a date's own history supports,
-reports its coverage (18%), and the harness **refuses to issue a verdict**
-below 50% coverage. A backtest of 18% of a model is not a backtest of the
-model.
+**The publication lag is the whole game.** FINRA short interest settles on
+the 15th and the last business day, but is not disseminated until roughly
+eight business days later. Keying a backtest off the settlement date uses
+information nobody had — the exact error the exercise exists to avoid,
+disguised as a fix for it. Every lookup filters on *publication* date, and
+EDGAR observations filter on `filed`, never on `end`.
 
-### How it evaluates, when it can
+Two axes remain genuinely unavailable: **borrow rate** (paid only) and
+**true free float** (EDGAR gives shares outstanding, which is larger, so
+short percentage is understated — conservative, but not the conventional
+number).
 
-Not by win rate — win rate on a long-only sample mostly measures whether
-the market rose during the window. The question is whether the score
-*ranks* outcomes:
+### The result
 
-- **Rank IC** — per-date Spearman correlation between score and forward
-  return, averaged across dates. Immune to overall market direction.
-- **Permutation null** — the same statistic with scores shuffled within
-  each date, many times, so the observed value can be read against what
-  noise produces at this sample size.
-- **Decile means** — forward return by score bucket, to see whether any
-  relationship is monotone or driven by one extreme bucket.
-
-**Overlapping windows.** A 10-day forward return sampled daily overlaps its
-neighbour by 9 days, so consecutive ICs are strongly autocorrelated and 400
-dates are nowhere near 400 independent observations. Both the t-statistic
-and the null run on non-overlapping subsamples (every h-th date), averaged
-across all h starting offsets so nothing depends on where the sample begins.
-
-> An earlier version of this module got that wrong in an instructive way: it
-> corrected the t-statistic for overlap but computed the null on all 400
-> dates, and the two disagreed — t = 0.35 ("nothing") against a 94th-
-> percentile null ("almost something"). Fixing the null to use the same
-> subsample moved it to the 96.5th percentile on offset 0 alone, which
-> looked *more* significant. Averaging over all ten offsets collapsed it to
-> the 63rd percentile. The apparent signal was entirely an artifact of which
-> date the subsample happened to start on.
-
-### The result on the testable fragment
-
-60 S&P 100 names, 400 dates, 24,000 observations, 10-bar forward returns:
+45 high-short-interest names, 500 days, 15,639 point-in-time observations,
+10-bar forward returns:
 
 | Metric | Value |
 |---|---:|
-| Rank IC (all dates) | +0.0105 |
-| Independent dates per subsample | 40 |
-| t-statistic (offset-averaged) | +0.38 |
-| t spread across offsets | 1.86 |
-| Permutation-null percentile | 62.6 |
-| Top-minus-bottom decile | −0.139% |
+| Rank IC (all dates) | −0.0493 |
+| t-statistic (offset-averaged) | −1.64 |
+| Permutation-null percentile | 3.0 |
+| Top-minus-bottom decile (mean) | **+13.5%** |
 
-No detectable rank information, and the decile table is not monotone — the
-top bucket underperforms the bottom one. On the 18% of the score that can
-be tested without lookahead bias, there is nothing there.
+Those last two rows disagree, and the disagreement is the finding.
 
-That is **not** a finding that the model fails. It is a finding that the
-tested fragment carries no signal, which is unsurprising given the fragment
-excludes every short-interest axis. The model as designed is untested.
+| Score decile | Mean return | Median return | P90 | Share >+20% |
+|---:|---:|---:|---:|---:|
+| 1 (lowest) | +0.95% | −0.49% | +17.2% | 7.2% |
+| 5 | +0.79% | +0.11% | +16.3% | 6.6% |
+| 8 | +1.85% | −0.88% | +20.3% | 10.2% |
+| 9 | +2.95% | −1.94% | +20.0% | 10.0% |
+| 10 (highest) | **+14.45%** | **−1.56%** | +23.9% | **13.0%** |
+
+The top decile has a mean of +14.5% and a median of −1.6%. Both are
+correct. Most high-scored names drift down; a few move violently up and
+carry the average alone.
+
+### Why rank IC was the wrong lens
+
+Section 9 argued that win rate is a poor measure because it mostly reflects
+market direction, and that rank IC is the right one. That reasoning holds
+for a factor expected to shift the whole distribution. It does **not** hold
+for a squeeze model, and this data is why.
+
+A rank correlation is driven by typical ordering. When most of a bucket
+drifts down while a minority explodes, it reports *negative* information —
+even though an equal-weighted holder of that bucket made money. The
+statistic is not wrong; it is answering a question nobody asked.
+
+So the harness now reports tail statistics alongside the rank statistics:
+the share of each bucket exceeding a large-move threshold, the P90 outcome,
+and a `tail_signature` flag when a bucket's mean and median disagree in
+sign. On this run the large-move rate rises monotonically from 7.2% in the
+bottom decile to 13.0% in the top — a **1.8x** concentration, with P90
+rising from +17.2% to +23.9%.
+
+### What can honestly be claimed
+
+- **As a ranking model: no evidence it works.** The rank IC is
+  indistinguishable from noise, and mildly negative.
+- **As a tail-exposure filter: suggestive, not established.** The
+  large-move gradient is monotone across all ten deciles, which is more
+  structure than noise usually produces. But the t-statistic does not clear
+  a conventional bar, 68% coverage is not 100%, the universe is
+  survivorship-biased, and the mean is dominated by a handful of
+  observations — exactly the regime where a result is least stable.
+- **Nothing here justifies trading it.** A concentration of tail outcomes
+  is not an edge until you have accounted for the cost of holding the
+  losers that produce it.
 
 ### Is the harness capable of finding anything?
 
 A test that finds nothing is worthless unless it can be shown to find
 something. `tests/test_squeeze_backtest.py` plants synthetic relationships
 of known strength and asserts they are recovered: an IC of 0.30 is detected
-at t > 3 and above the 97.5th null percentile, an IC of 0.15 is detected, an
-*inverted* relationship is detected and flagged as negative, and ten
-independent noise samples produce null percentiles that do not cluster at
-the extremes. The harness has power; the data does not have signal.
+at t > 3 above the 97.5th null percentile, 0.15 is detected, an *inverted*
+relationship is detected and flagged negative, and ten independent noise
+samples produce null percentiles that do not cluster at the extremes. It
+also asserts that a planted IC of 0.40 still returns **inconclusive** at 18%
+coverage — the gate holds even when a signal is plainly present.
 
-### What would make this a real answer
+### Overlapping windows
 
-A point-in-time short-interest archive. FINRA publishes bi-monthly
-short-interest files going back years and they are free; Fintel and Ortex
-sell cleaner daily series with borrow rates. Loading either behind the
-`PointInTimeSource` protocol turns this into a genuine validation with no
-change to the harness — that interface exists precisely so the swap is a
-data problem, not a code problem.
+A 10-day forward return sampled daily overlaps its neighbour by 9 days, so
+400 dates are nowhere near 400 independent observations. Both the
+t-statistic and the null run on non-overlapping subsamples (every h-th
+date), averaged across all h starting offsets so nothing depends on where
+the sample begins.
+
+> An earlier version got this wrong instructively. It corrected the
+> t-statistic but computed the null on all 400 dates, and the two
+> disagreed. Fixing the null to use one subsample moved it to the 96.5th
+> percentile — *more* significant-looking. Averaging over all ten offsets
+> collapsed it to the 63rd. The apparent signal was entirely an artifact of
+> which date the subsample happened to start on.
 
 ---
 
@@ -711,9 +727,10 @@ the top dominate everything below them.
    bought" versus "customer sold" cannot be distinguished — which is what
    makes §2 an assumption rather than a measurement.
 7. **The squeeze weights are uncalibrated** (§9), and cannot be validated on free data ([§10](#10-does-the-squeeze-score-work)).
-8. **Free-tier data is delayed ~15 minutes and rate-limited**, and quality
-   degrades sharply on illiquid contracts. See
-   [`data_sources.md`](data_sources.md).
+8. **Free-tier data is delayed ~15 minutes.** Since switching the default
+   free source to Cboe (exchange-computed IV and Greeks, whole chain in one
+   keyless request) the *quality* problem is much reduced, but the delay
+   remains. See [`data_sources.md`](data_sources.md).
 9. **`r` defaults to 4% and `q` to 0** unless a caller passes otherwise.
    Both are second-order for short horizons but not for LEAPS or for
    high-yield names.
@@ -725,10 +742,13 @@ the top dominate everything below them.
 Listed explicitly because earlier revisions of this document described
 these as though they existed.
 
-- **A conclusive squeeze-scorer backtest.** The harness is built and
-  tested (`platform/squeeze_backtest.py`, [§10](#10-does-the-squeeze-score-work));
-  what is missing is a point-in-time short-interest archive to feed it.
-  Until then the model is untested rather than validated.
+- **The last 32% of backtest coverage.** Borrow rate is paid-only and true
+  free float is not published free, so those two axes stay untested
+  ([§10](#10-does-the-squeeze-score-work)).
+- **A proper evaluation of the tail result.** The large-move concentration
+  in §10 deserves a purpose-built test — a payoff-weighted statistic rather
+  than a rank one, out-of-sample replication, and a delisting-inclusive
+  universe to remove survivorship bias.
 - **Intraday node-strength trajectories.** `analytics/atlas.py` stores
   intraday OI/GEX snapshots and computes growth metrics; the fuller
   node typology (air pockets, rug pulls, slingshots) sketched in earlier

@@ -300,7 +300,10 @@ def validate_mc(paths, steps, converge, spot, iv, days):
 @click.option("--permutations", default=1000, type=int, help="shuffles for the null")
 @click.option("--vol-proxy/--no-vol-proxy", default=False,
               help="substitute a realised-vol ratio for the IV/HV axis (see docs)")
-def backtest_squeeze(universe, limit, lookback, hold, permutations, vol_proxy):
+@click.option("--short-interest/--no-short-interest", "use_si", default=True,
+              help="add point-in-time short interest from FINRA + SEC EDGAR "
+                   "(free; lifts coverage from 18% to 68%)")
+def backtest_squeeze(universe, limit, lookback, hold, permutations, vol_proxy, use_si):
     """Test whether a higher squeeze score predicts a better forward return.
 
     Evaluates the score cross-sectionally: on each date, does the ranking of
@@ -316,14 +319,32 @@ def backtest_squeeze(universe, limit, lookback, hold, permutations, vol_proxy):
     """
     from rich.table import Table
     from apexflow.platform import SqueezeBacktester, PriceDerivedSource
+    from apexflow.platform.squeeze_backtest import HistoricalShortInterestSource
+    from apexflow.providers.shortinterest_provider import (
+        sec_user_agent, SEC_USER_AGENT_ENV)
 
     syms = load_universe(universe)[:limit]
-    source = PriceDerivedSource(use_realised_vol_proxy=vol_proxy)
+    price_src = PriceDerivedSource(use_realised_vol_proxy=vol_proxy)
+    if use_si:
+        source = HistoricalShortInterestSource(price_source=price_src)
+        if not sec_user_agent():
+            console.print(
+                f"[yellow]{SEC_USER_AGENT_ENV} is not set — SEC share counts "
+                f"will be skipped, so short-%-of-float is unavailable.[/yellow]\n"
+                f"[dim]Set it to 'Your Name your.email@example.com'; the SEC "
+                f"requires a contact address and returns 403 without one.[/dim]")
+    else:
+        source = price_src
 
     console.print(f"[cyan]Backtesting squeeze score — {len(syms)} symbols, "
                   f"{lookback}d of dates, {hold}-bar hold[/]")
     console.print(f"[dim]Point-in-time coverage: {source.coverage:.0%} of the score "
-                  f"({', '.join(sorted(source.covers))})[/dim]\n")
+                  f"({', '.join(sorted(source.covers))})[/dim]")
+
+    if use_si:
+        console.print("[dim]Warming FINRA/SEC cache (first run only)…[/dim]")
+        source.warm(syms)
+    console.print()
 
     bt = SqueezeBacktester(source=source)
     panel = bt.build_panel(syms, lookback_days=lookback, hold_days=hold)
@@ -348,14 +369,23 @@ def backtest_squeeze(universe, limit, lookback, hold, permutations, vol_proxy):
     if rep.decile_returns:
         dec = Table(title=f"Mean {hold}-bar forward return by score bucket",
                     header_style="bold cyan", expand=True)
-        for col in ("Bucket", "N", "Mean score", "Mean return", "Median return"):
+        for col in ("Bucket", "N", "Mean score", "Mean return", "Median return",
+                    "P90", ">+20%"):
             dec.add_column(col, justify="right")
         for r in rep.decile_returns:
             colour = "green" if r["mean_return"] > 0 else "red"
             dec.add_row(str(r["bucket"]), f"{r['n']:,}", f"{r['mean_score']:.1f}",
                         f"[{colour}]{r['mean_return']:+.3f}%[/{colour}]",
-                        f"{r['median_return']:+.3f}%")
+                        f"{r['median_return']:+.3f}%",
+                        f"{r['p90_return']:+.1f}%",
+                        f"{r['tail_rate']:.1%}")
         console.print(dec)
+        if rep.tail_signature:
+            console.print(
+                f"[yellow]Right-tailed payoff:[/yellow] the top bucket's mean and "
+                f"median disagree in sign. Large-move rate {rep.top_tail_rate:.1%} "
+                f"top vs {rep.bottom_tail_rate:.1%} bottom "
+                f"({rep.tail_ratio:.1f}x). A rank statistic cannot see this.")
 
     console.print()
     if rep.conclusive:
