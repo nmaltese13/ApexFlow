@@ -131,3 +131,140 @@ def is_expired(expiry: str | date | datetime | None,
     if exp is None:
         return False
     return _as_utc(now) >= market_close_utc(exp)
+
+
+# ---------------------------------------------------------------------------
+# Market sessions
+# ---------------------------------------------------------------------------
+# The previous session check lived in atlas.py and compared against fixed UTC
+# minutes (13:30-20:00). That is 9:30-16:00 ET only while daylight saving is
+# in effect; for the roughly four months either side of it the same constants
+# mean 8:30-15:00 ET, so the market read as open an hour before it was and
+# closed an hour before it did. It also ignored holidays entirely.
+#
+# Being wrong about whether the market is open matters more in a trading
+# context than an analytical one: it is what separates "this quote is
+# correctly hours old because it is Sunday" from "this feed has died".
+
+REGULAR_OPEN = time(9, 30)
+REGULAR_CLOSE = time(16, 0)
+EARLY_CLOSE = time(13, 0)
+
+
+def _easter(year: int) -> date:
+    """Gregorian Easter Sunday (Anonymous algorithm) — for Good Friday."""
+    a = year % 19
+    b, c = divmod(year, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month, day = divmod(h + l - 7 * m + 114, 31)
+    return date(year, month, day + 1)
+
+
+def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
+    """The nth `weekday` of a month (n=-1 for the last one)."""
+    if n > 0:
+        d = date(year, month, 1)
+        offset = (weekday - d.weekday()) % 7
+        return d + timedelta(days=offset + 7 * (n - 1))
+    nxt = date(year + (month == 12), (month % 12) + 1, 1)
+    d = nxt - timedelta(days=1)
+    return d - timedelta(days=(d.weekday() - weekday) % 7)
+
+
+def _observed(d: date) -> date:
+    """US convention: Saturday holidays observe Friday, Sunday observes Monday."""
+    if d.weekday() == 5:
+        return d - timedelta(days=1)
+    if d.weekday() == 6:
+        return d + timedelta(days=1)
+    return d
+
+
+def market_holidays(year: int) -> set[date]:
+    """NYSE/Nasdaq full-day closures for `year`.
+
+    Excludes ad-hoc closures (presidential funerals, Hurricane Sandy), which
+    cannot be computed and are rare enough to accept.
+    """
+    return {
+        _observed(date(year, 1, 1)),                     # New Year's Day
+        _nth_weekday(year, 1, 0, 3),                     # MLK Day
+        _nth_weekday(year, 2, 0, 3),                     # Presidents Day
+        _easter(year) - timedelta(days=2),               # Good Friday
+        _nth_weekday(year, 5, 0, -1),                    # Memorial Day
+        _observed(date(year, 6, 19)),                    # Juneteenth
+        _observed(date(year, 7, 4)),                     # Independence Day
+        _nth_weekday(year, 9, 0, 1),                     # Labor Day
+        _nth_weekday(year, 11, 3, 4),                    # Thanksgiving
+        _observed(date(year, 12, 25)),                   # Christmas
+    }
+
+
+def early_close_days(year: int) -> set[date]:
+    """Sessions that end at 13:00 ET instead of 16:00."""
+    days = {_nth_weekday(year, 11, 3, 4) + timedelta(days=1)}   # day after Thanksgiving
+    for d in (date(year, 7, 3), date(year, 12, 24)):
+        if d.weekday() < 5:
+            days.add(d)
+    return days
+
+
+def is_trading_day(day: date) -> bool:
+    return day.weekday() < 5 and day not in market_holidays(day.year)
+
+
+def session_close(day: date) -> time:
+    return EARLY_CLOSE if day in early_close_days(day.year) else REGULAR_CLOSE
+
+
+def market_state(now: datetime | None = None) -> str:
+    """One of: ``open``, ``premarket``, ``afterhours``, ``closed``.
+
+    ``closed`` means a weekend or holiday; ``premarket``/``afterhours`` mean
+    a trading day outside the regular session.
+    """
+    now = _as_utc(now)
+    if _NY is None:                      # no tz database — assume open, warn elsewhere
+        return "open"
+    local = now.astimezone(_NY)
+    day = local.date()
+    if not is_trading_day(day):
+        return "closed"
+    t = local.time()
+    if t < REGULAR_OPEN:
+        return "premarket"
+    if t > session_close(day):
+        return "afterhours"
+    return "open"
+
+
+def is_market_open(now: datetime | None = None) -> bool:
+    """True only during the regular session on a trading day."""
+    return market_state(now) == "open"
+
+
+def last_session_close(now: datetime | None = None) -> datetime:
+    """UTC datetime of the most recent regular-session close.
+
+    What a quote's age should be measured against outside market hours: a
+    price that is sixteen hours old at 8am Saturday is correct, not broken.
+    """
+    now = _as_utc(now)
+    if _NY is None:
+        return now
+    local = now.astimezone(_NY)
+    day = local.date()
+    if is_trading_day(day) and local.time() > session_close(day):
+        close_local = datetime.combine(day, session_close(day), tzinfo=_NY)
+        return close_local.astimezone(timezone.utc)
+    for back in range(1, 12):
+        d = day - timedelta(days=back)
+        if is_trading_day(d):
+            return datetime.combine(d, session_close(d), tzinfo=_NY).astimezone(timezone.utc)
+    return now

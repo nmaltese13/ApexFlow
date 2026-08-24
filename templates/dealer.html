@@ -134,6 +134,53 @@
     </section>
   </div>
 
+  <section class="panel rk-panel">
+    <div class="panel-head">
+      <h3>Position Sizing</h3>
+      <span class="panel-sub">
+        Your numbers only — this reads no market data and takes no view
+      </span>
+    </div>
+
+    <div class="rk-grid">
+      <label class="rk-field">
+        <span>Account equity</span>
+        <input id="rk-equity" type="number" class="pick" value="25000" min="1" step="1000">
+      </label>
+      <label class="rk-field">
+        <span>Risk per trade %
+          <span class="info" data-tip="Fraction of equity you accept losing if the stop is hit. 0.5–2% is the usual range; above 5% this tool refuses to size.">i</span>
+        </span>
+        <input id="rk-risk" type="number" class="pick" value="1" min="0.05" max="5" step="0.05">
+      </label>
+      <label class="rk-field">
+        <span>Entry</span>
+        <input id="rk-entry" type="number" class="pick" value="100" min="0.01" step="0.01">
+      </label>
+      <label class="rk-field">
+        <span>Stop
+          <span class="info" data-tip="The price at which the idea is wrong. Size falls out of the distance between this and entry.">i</span>
+        </span>
+        <input id="rk-stop" type="number" class="pick" value="97" min="0.01" step="0.01">
+      </label>
+      <label class="rk-field">
+        <span>Target <em>(optional)</em></span>
+        <input id="rk-target" type="number" class="pick" value="" min="0" step="0.01" placeholder="—">
+      </label>
+      <label class="rk-field">
+        <span>Instrument</span>
+        <select id="rk-unit" class="pick">
+          <option value="shares" selected>shares</option>
+          <option value="contracts">option contracts</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="rk-result" id="rk-result">
+      <div class="empty-sm">Enter your numbers above.</div>
+    </div>
+  </section>
+
   <p class="dg-footnote">
     Every figure above is conditional on the dealer-positioning assumption
     selected in the toolbar — it is a model input, not an observation.

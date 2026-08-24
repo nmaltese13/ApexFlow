@@ -233,3 +233,75 @@ document.addEventListener('keydown', e => {
     e.preventDefault(); openCmdK();
   }
 });
+
+/* =========================================================================
+   DATA FRESHNESS BANNER
+
+   A delayed quote and a dead feed used to render identically. This polls
+   /api/freshness and puts an unmissable bar at the top of the page when the
+   data behind it is not current enough to act on.
+
+   Deliberately not dismissible while the condition holds: the whole point
+   is that stale data is invisible, and a banner you can click away is one
+   you will click away.
+   ========================================================================= */
+(function freshnessWatch() {
+  const banner = document.getElementById('stale-banner');
+  const foot = document.getElementById('foot-freshness');
+  if (!banner && !foot) return;
+
+  const SYM_FROM_PAGE = () =>
+    document.querySelector('.sym-page')?.dataset.symbol
+    || document.getElementById('dg-sym')?.value
+    || document.getElementById('gx-sym')?.value
+    || 'SPY';
+
+  function render(f) {
+    if (foot) {
+      const bits = [`${f.provider || f.source} · ${f.age_label} old`];
+      if (f.market_state) bits.push(`market ${f.market_state}`);
+      foot.textContent = bits.join(' · ');
+      foot.className = 'muted fresh-' + f.level;
+    }
+    if (!banner) return;
+
+    // Only shout for the two states that can mislead: an outright stale
+    // feed during an open session, or data with no timestamp at all.
+    const shout = f.level === 'stale' || f.level === 'unknown';
+    banner.hidden = !shout;
+    if (shout) {
+      banner.className = 'stale-banner stale-' + f.level;
+      banner.innerHTML =
+        `<strong>${f.level === 'stale' ? 'Stale data' : 'Unknown data age'}</strong>`
+        + ` — ${escapeHtml(f.detail)}`
+        + ` <span class="stale-meta">Do not act on these numbers until this clears.</span>`;
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g,
+      ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  async function poll() {
+    try {
+      const r = await fetch('/api/freshness?sym=' + encodeURIComponent(SYM_FROM_PAGE()));
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      render(await r.json());
+    } catch (e) {
+      // The freshness check itself failing is exactly the situation the
+      // banner exists for, so say so rather than staying silent.
+      if (banner) {
+        banner.hidden = false;
+        banner.className = 'stale-banner stale-unknown';
+        banner.innerHTML = '<strong>Data age unknown</strong> — the freshness '
+          + 'check could not reach the server. Treat everything on screen as '
+          + 'potentially out of date.';
+      }
+      if (foot) foot.textContent = 'data age unknown';
+    }
+  }
+
+  poll();
+  setInterval(poll, 30_000);
+})();

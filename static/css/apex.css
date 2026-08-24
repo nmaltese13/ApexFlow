@@ -1860,3 +1860,69 @@ input:focus-visible, .navlink:focus-visible {
   .chart-wrap.tall { height: 340px; }
   .dg-metric-tabs { flex-wrap: wrap; }
 }
+
+/* =========================================================================
+   DATA FRESHNESS
+   ========================================================================= */
+.stale-banner {
+  padding: 10px 16px; font-size: 12.5px; line-height: 1.5;
+  border-bottom: 1px solid var(--red); background: var(--red-soft);
+  color: var(--txt); position: sticky; top: 0; z-index: 60;
+}
+.stale-banner strong { color: var(--red); letter-spacing: 0.01em; }
+.stale-banner.stale-unknown { border-bottom-color: var(--amber); background: var(--amber-soft); }
+.stale-banner.stale-unknown strong { color: var(--amber); }
+.stale-meta { display: block; margin-top: 3px; color: var(--txt-2); font-size: 11.5px; }
+
+.fresh-live    { color: var(--green) !important; }
+.fresh-delayed { color: var(--txt-mute) !important; }
+.fresh-stale   { color: var(--red) !important; }
+.fresh-unknown { color: var(--amber) !important; }
+
+/* =========================================================================
+   POSITION SIZING
+   Visually distinct from the exposure panels above: those model the market,
+   this constrains your account. Keeping them from looking alike is part of
+   keeping a description from reading as a recommendation.
+   ========================================================================= */
+.rk-panel { border-left: 2px solid var(--accent-deep); }
+.rk-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px; padding: 14px;
+}
+.rk-field { display: flex; flex-direction: column; gap: 5px; }
+.rk-field > span {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--txt-mute); display: flex; align-items: center; gap: 5px;
+}
+.rk-field em { text-transform: none; letter-spacing: 0; opacity: 0.7; }
+.rk-field input, .rk-field select { width: 100%; }
+
+.rk-result { padding: 0 14px 14px; }
+.rk-headline { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.rk-qty {
+  font-size: 30px; font-weight: 700; color: var(--accent);
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.rk-unit { font-size: 12px; color: var(--txt-mute); }
+.rk-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 10px; padding: 5px 0; font-size: 12px; color: var(--txt-2);
+  border-bottom: 1px solid var(--line);
+}
+.rk-row strong { color: var(--txt); font-variant-numeric: tabular-nums; }
+.rk-row em { color: var(--txt-mute); font-size: 11px; }
+.rk-note { font-size: 11px; color: var(--txt-mute); padding: 6px 0; line-height: 1.55; }
+.rk-warnings {
+  margin: 10px 0 0; padding: 9px 12px 9px 26px; list-style: disc;
+  background: var(--amber-soft); border-left: 3px solid var(--amber);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 11px; color: var(--txt-2); line-height: 1.6;
+}
+.rk-warnings li + li { margin-top: 4px; }
+.rk-refuse {
+  padding: 11px 13px; background: var(--red-soft);
+  border-left: 3px solid var(--red); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 12px; color: var(--txt-2); line-height: 1.6;
+}
+.rk-refuse strong { color: var(--red); }

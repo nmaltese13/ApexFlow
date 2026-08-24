@@ -120,7 +120,8 @@
   </header>
 
   <main class="content">
-    {% block content %}{% endblock %}
+    <div id="stale-banner" class="stale-banner" hidden role="alert"></div>
+{% block content %}{% endblock %}
   </main>
 
   <footer class="appfoot">
@@ -130,7 +131,8 @@
       <span class="kchip {{ 'on' if ok else 'off' }}">{{ name.split(' (')[0] }}</span>
     {% endfor %}
     <span class="sep">·</span>
-    <span class="muted">Data may be delayed. Educational research tool — not investment advice.</span>
+    <span class="muted" id="foot-freshness">Checking data age…</span>
+    <span class="muted">Educational research tool — not investment advice.</span>
   </footer>
 
 </div>

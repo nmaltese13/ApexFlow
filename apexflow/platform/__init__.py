@@ -7,7 +7,9 @@ from .squeeze_backtest import (
     SqueezeBacktester, PriceDerivedSource, SqueezeBacktestReport,
 )
 from .signal_logger import SignalLogger
+from .freshness import Freshness, assess as assess_freshness
 
 __all__ = ["ScannerHub", "Watchlist", "AlertManager", "LiveAlertsEngine",
            "Backtester", "SignalLogger",
-           "SqueezeBacktester", "PriceDerivedSource", "SqueezeBacktestReport"]
+           "SqueezeBacktester", "PriceDerivedSource", "SqueezeBacktestReport",
+           "Freshness", "assess_freshness"]

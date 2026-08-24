@@ -226,6 +226,11 @@ class CboeProvider(DataProvider):
                          if not side.empty else pd.DataFrame(columns=_CHAIN_COLUMNS))
         out["expiry"] = target
         out["spot"] = df.attrs.get("spot", 0.0)
+        # Stamp when this payload was actually produced. Without it, a chain
+        # served from cache after a failed fetch is indistinguishable from a
+        # fresh one — see platform/freshness.py.
+        out["as_of"] = df.attrs.get("fetched_at")
+        out["source"] = self.name
         return out
 
     def full_chain(self, symbol: str) -> pd.DataFrame | None:

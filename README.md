@@ -57,6 +57,32 @@ python main.py validate-mc                    # check the simulator against clos
 | [`earnings_direction.py`](apexflow/analytics/earnings_direction.py) | Five-layer directional positioning read |
 | [`key_levels.py`](apexflow/analytics/key_levels.py), [`levels.py`](apexflow/analytics/levels.py) | PDH/PDL, POC/VAH/VAL, HVN/LVN; HVL, walls, charm/vanna peaks |
 
+### Using this with real money
+
+Two safety layers exist because the analytics alone are not a trading tool.
+
+**Data freshness.** A 15-minute-delayed quote used to render identically to
+a live one, and a dead feed identically to both — the most expensive failure
+mode a tool like this has, because it is invisible. Every payload now
+carries an age, measured against the *market session* rather than the wall
+clock (data that is 16 hours old on a Saturday is correct; 16 minutes old
+on a Wednesday may mean the feed stopped). A feed is never reported fresher
+than it can be: Cboe's file is seconds old but its prices are 15 minutes
+old, so it tops out at `delayed` and only a real-time provider can read
+`live`. Anything stale raises a banner that says not to act on it.
+
+**Position sizing** (`/dealer`, `/api/size`). Fixed-fractional: risk a
+constant fraction of equity and let the stop distance set the size, so one
+trade cannot ruin you by construction. It reads no market data and takes no
+view — it answers "how much", never "whether" — and refuses rather than
+guesses when the inputs would produce an unsurvivable position.
+
+**What is deliberately absent:** no broker connection, no order routing, no
+automated execution, and no signal generation. The one model formally tested
+here showed *no* rank information ([§10](docs/methodology.md#10-does-the-squeeze-score-work)),
+so there is no validated edge in this repository to trade. It is a lens on
+market structure and a discipline for sizing; the decisions are yours.
+
 ### Four things worth knowing about the numbers
 
 **The dealer positioning assumption dominates everything.** GEX, VEX and

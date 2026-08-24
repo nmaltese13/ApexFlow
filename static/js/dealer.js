@@ -280,3 +280,82 @@ function dgRenderTable(d) {
 dgApplyState();
 dgWire();
 dgLoad();
+
+
+/* =========================================================================
+   POSITION SIZING
+
+   Pure arithmetic on the user's own inputs. Kept visually separate from the
+   exposure surface above because it is a different kind of thing: the
+   exposure numbers are a model of the market, these are a constraint on
+   your own account, and conflating the two is how a description becomes a
+   recommendation.
+   ========================================================================= */
+(function sizing() {
+  const ids = ['rk-equity', 'rk-risk', 'rk-entry', 'rk-stop', 'rk-target', 'rk-unit'];
+  const els = Object.fromEntries(ids.map(i => [i, document.getElementById(i)]));
+  const out = document.getElementById('rk-result');
+  if (!out || ids.some(i => !els[i])) return;
+
+  const num = el => {
+    const v = parseFloat(el.value);
+    return Number.isFinite(v) ? v : null;
+  };
+
+  let timer = null;
+  const debounce = fn => (...a) => { clearTimeout(timer); timer = setTimeout(() => fn(...a), 220); };
+
+  async function compute() {
+    const equity = num(els['rk-equity']);
+    const risk = num(els['rk-risk']);
+    const entry = num(els['rk-entry']);
+    const stop = num(els['rk-stop']);
+    const target = num(els['rk-target']);
+    if (equity == null || risk == null || entry == null || stop == null) {
+      out.innerHTML = '<div class="empty-sm">Enter equity, risk %, entry and stop.</div>';
+      return;
+    }
+    const params = new URLSearchParams({
+      equity, risk_pct: risk, entry, stop, unit: els['rk-unit'].value,
+    });
+    if (target != null) params.set('target', target);
+
+    try {
+      const r = await fetch('/api/size?' + params.toString());
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+      render(d);
+    } catch (e) {
+      out.innerHTML = `<div class="rk-refuse">${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function render(d) {
+    if (!d.ok) {
+      out.innerHTML = `<div class="rk-refuse"><strong>Not sized.</strong> ${escapeHtml(d.detail)}</div>`;
+      return;
+    }
+    const warn = (d.warnings || []).map(w =>
+      `<li>${escapeHtml(w)}</li>`).join('');
+    const rw = d.reward
+      ? `<div class="rk-row"><span>Reward / risk</span><strong>${d.reward.r}R</strong></div>
+         <div class="rk-note">${escapeHtml(d.reward.detail)}</div>`
+      : '';
+    out.innerHTML = `
+      <div class="rk-headline">
+        <span class="rk-qty">${d.quantity.toLocaleString()}</span>
+        <span class="rk-unit">${d.unit}</span>
+      </div>
+      <div class="rk-row"><span>Risk if stopped</span><strong>$${d.risk_amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></div>
+      <div class="rk-row"><span>Position value</span><strong>$${d.position_value.toLocaleString(undefined, {maximumFractionDigits: 0})}</strong> <em>(${(d.position_pct_of_equity * 100).toFixed(1)}% of equity)</em></div>
+      <div class="rk-row"><span>Stop distance</span><strong>$${d.stop_distance.toFixed(2)}</strong> <em>(${(d.stop_distance_pct * 100).toFixed(2)}%)</em></div>
+      ${rw}
+      ${warn ? `<ul class="rk-warnings">${warn}</ul>` : ''}`;
+  }
+
+  ids.forEach(i => {
+    els[i].addEventListener('input', debounce(compute));
+    els[i].addEventListener('change', debounce(compute));
+  });
+  compute();
+})();

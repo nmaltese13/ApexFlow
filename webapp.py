@@ -38,6 +38,8 @@ from apexflow.analytics.projection import (
 )
 from apexflow.analytics import montecarlo as mc
 from apexflow.analytics.rates import risk_free_rate
+from apexflow.platform.freshness import assess as assess_freshness
+from apexflow.analytics.timeutil import market_state
 from apexflow.analytics.iv_surface import (
     atm_iv as robust_atm_iv, first_usable_atm_iv, iv_term_structure,
     risk_reversal_25d,
@@ -90,6 +92,27 @@ app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 # Tiny in-memory cache (provider already caches; this avoids repeating scans)
 # -----------------------------------------------------------------------------
 _cache: dict[str, tuple[float, Any]] = {}
+
+def freshness_for(sym: str | None = None) -> dict:
+    """How fresh is the data this request is built on?
+
+    Derived from the provider's own timestamp where it gives one. Returned
+    on the payloads that drive decisions so the UI can surface it rather
+    than leaving the user to assume the numbers are current.
+    """
+    prov = get_provider()
+    as_of = None
+    try:
+        if sym:
+            q = prov.quote(sym) or {}
+            as_of = q.get("as_of") or q.get("timestamp")
+            if as_of is None:
+                ch = prov.options_chain(sym)
+                as_of = ch.get("as_of")
+    except Exception as e:
+        log.debug("freshness probe failed for %s: %s", sym, e)
+    return assess_freshness(as_of, source=getattr(prov, "name", "unknown")).to_dict()
+
 
 def rate_for(t_years: float) -> float:
     """Tenor-matched risk-free rate, or the static default when disabled.
@@ -644,6 +667,7 @@ def api_dealer_greeks(sym: str, dte_max: int = 30, convention: str = "naive",
         return {
             "symbol": sym,
             "spot": spot,
+            "freshness": freshness_for(sym),
             "convention": convention,
             "basis": basis,
             "expiries_used": used,
@@ -934,6 +958,7 @@ def api_projection(sym: str, dte_max: int = 7, horizon_days: float = 1.0,
             "gamma_walls": walls,
             "cone": cone,
             "gamma_flip": flip,
+            "freshness": freshness_for(sym),
             "gamma_flip_detail": {
                 "regime": flip_detail.get("regime", "unknown"),
                 "bracketed": flip_detail.get("bracketed", False),
@@ -1537,6 +1562,52 @@ def api_regime():
             "breadth_pct": float(breadth_pct),
         }
     return cached("regime", ttl=60, fetch=fetch)
+
+
+@app.get("/api/size")
+def api_size(equity: float, risk_pct: float, entry: float,
+             stop: float | None = None, target: float | None = None,
+             unit: str = "shares", premium: float | None = None,
+             max_position_pct: float = 100.0):
+    """Position size from your own numbers. Reads no market data.
+
+    Fixed-fractional: risk a constant fraction of equity and let the stop
+    distance determine size. Pass `premium` with unit=contracts to size a
+    long option against the premium instead of a stop.
+
+    Deliberately not connected to any signal — it answers "how much", never
+    "whether". Refuses rather than guesses on inputs that would produce an
+    unsurvivable position.
+    """
+    from apexflow.platform.risk import (
+        size_by_stop, size_options_by_premium, r_multiple)
+
+    frac = max(risk_pct, 0.0) / 100.0
+    if premium is not None and premium > 0:
+        result = size_options_by_premium(equity, frac, premium)
+    elif stop is not None:
+        result = size_by_stop(equity, frac, entry, stop, unit=unit,
+                              max_position_fraction=max(max_position_pct, 0.0) / 100.0)
+    else:
+        raise HTTPException(400, "provide either a stop price or a premium")
+
+    out = result.to_dict()
+    if target is not None and stop is not None:
+        out["reward"] = r_multiple(entry, stop, target)
+    return out
+
+
+@app.get("/api/freshness")
+def api_freshness(sym: str = "SPY"):
+    """Data age and whether it is current enough to act on.
+
+    Polled by the UI banner. Deliberately cheap and never cached, since a
+    cached freshness reading is a contradiction in terms.
+    """
+    f = freshness_for(sym)
+    f["market_state"] = market_state()
+    f["provider"] = getattr(get_provider(), "name", "unknown")
+    return f
 
 
 @app.get("/api/health")
