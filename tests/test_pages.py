@@ -6,6 +6,8 @@ no network.
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
 import pytest
 
 os.environ.setdefault("APEXFLOW_DEMO", "1")
@@ -132,10 +134,44 @@ class TestNoDeadAssets:
         root = Path(webapp.__file__).resolve().parent
         missing = []
         for tpl in (root / "templates").glob("*.html"):
-            for src in re.findall(r'src="/static/(js/[^"]+)"', tpl.read_text(encoding="utf-8")):
+            for src in re.findall(r'src="/static/(js/[^"?]+)', tpl.read_text(encoding="utf-8")):
+                # Strip the ?v= cache-busting token before resolving the path.
                 if not (root / "static" / src).exists():
                     missing.append(f"{tpl.name} -> {src}")
         assert not missing, f"templates reference missing scripts: {missing}"
+
+    def test_static_assets_are_cache_busted(self):
+        """Every local asset URL must carry a version token.
+
+        Without it a browser can run yesterday's JavaScript against today's
+        markup, which looks like a broken page and is invisible server-side.
+        """
+        import re
+        from pathlib import Path
+        root = Path(webapp.__file__).resolve().parent
+        bare = []
+        for tpl in (root / "templates").glob("*.html"):
+            for ref in re.findall(r'(?:src|href)="(/static/[^"]+)"',
+                                  tpl.read_text(encoding="utf-8")):
+                if "?v=" not in ref:
+                    bare.append(f"{tpl.name} -> {ref}")
+        assert not bare, f"un-versioned static refs: {bare}"
+
+    def test_asset_version_changes_with_content(self, tmp_path, monkeypatch):
+        """The token must actually track file state, not be a constant."""
+        first = webapp.asset_version()
+        assert first and first != "0"
+        js = Path(webapp.__file__).resolve().parent / "static" / "js" / "apex.js"
+        original = js.stat().st_mtime
+        try:
+            # Must exceed *every* other asset's mtime, since the token is a
+            # max() across all of them — a small bump on a file that is not
+            # already the newest changes nothing.
+            bumped = original + 86_400
+            os.utime(js, (bumped, bumped))
+            assert webapp.asset_version() != first
+        finally:
+            os.utime(js, (original, original))
 
     def test_no_orphaned_page_scripts(self):
         """Every page script should be loaded by some template."""

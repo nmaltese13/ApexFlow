@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#05070c">
 <title>ApexFlow{% block title %}{% endblock %} · Quant Terminal</title>
-<link rel="stylesheet" href="/static/css/apex.css">
+<link rel="stylesheet" href="/static/css/apex.css?v={{ asset_v }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -150,7 +150,7 @@
   </div>
 </div>
 
-<script src="/static/js/apex.js"></script>
+<script src="/static/js/apex.js?v={{ asset_v }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

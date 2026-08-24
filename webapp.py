@@ -148,12 +148,30 @@ def cached(key: str, ttl: float, fetch):
 # -----------------------------------------------------------------------------
 # HTML routes
 # -----------------------------------------------------------------------------
+def asset_version() -> str:
+    """Cache-busting token derived from the newest static file's mtime.
+
+    Browsers cache /static/js/*.js aggressively, so an edit can leave a user
+    running yesterday's JavaScript against today's markup — which looks
+    exactly like "the page is broken" and is invisible from the server side.
+    Appending this to every asset URL makes a changed file a changed URL.
+    """
+    try:
+        newest = max(f.stat().st_mtime
+                     for pattern in ("js/*.js", "css/*.css")
+                     for f in (ROOT / "static").glob(pattern))
+        return str(int(newest))
+    except (ValueError, OSError):
+        return "0"
+
+
 def _base_ctx(request: Request) -> dict:
     return {
         "request": request,
         "providers": config.configured_providers(),
         "active_provider": get_provider().name,
         "now": datetime.now().strftime("%H:%M:%S"),
+        "asset_v": asset_version(),
     }
 
 
