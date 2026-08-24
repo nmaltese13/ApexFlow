@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %} · Dealer Exposure{% endblock %}
+{% block content %}
+
+<div class="dash dealer-page">
+
+  <section class="panel">
+    <div class="panel-head">
+      <h3>Dealer Exposure Surface</h3>
+      <span class="panel-sub">DEX · GEX · VEX · charm · vanna, rolled across expiries</span>
+    </div>
+
+    <div class="dg-toolbar">
+      <div class="dg-tb-group">
+        <input id="dg-sym" class="gx-sym-input" type="text" value="SPY" maxlength="6"
+               placeholder="SYM" autocomplete="off" spellcheck="false">
+        <div class="gx-presets" id="dg-presets">
+          <button data-sym="SPY">SPY</button>
+          <button data-sym="QQQ">QQQ</button>
+          <button data-sym="IWM">IWM</button>
+          <button data-sym="NVDA">NVDA</button>
+          <button data-sym="TSLA">TSLA</button>
+          <button data-sym="GME">GME</button>
+        </div>
+      </div>
+
+      <div class="dg-tb-group">
+        <span class="gx-tb-label">DTE</span>
+        <select id="dg-dte" class="pick">
+          <option value="7">0–7</option>
+          <option value="30" selected>0–30</option>
+          <option value="60">0–60</option>
+          <option value="180">0–180</option>
+        </select>
+      </div>
+
+      <div class="dg-tb-group">
+        <span class="gx-tb-label">Dealers are
+          <span class="info" data-tip="Every number here is conditional on this assumption. Open interest says a contract exists, not who holds it. Invert the assumption and every sign flips.">i</span>
+        </span>
+        <select id="dg-convention" class="pick">
+          <option value="naive" selected>long calls / short puts</option>
+          <option value="inverted">short calls / long puts</option>
+          <option value="all_short">short both sides</option>
+        </select>
+      </div>
+
+      <div class="dg-tb-group">
+        <span class="gx-tb-label">Basis
+          <span class="info" data-tip="Open interest is the resting book. Volume approximates positioning added today.">i</span>
+        </span>
+        <select id="dg-basis" class="pick">
+          <option value="openInterest" selected>open interest</option>
+          <option value="volume">today's volume</option>
+        </select>
+        <button id="dg-refresh" class="btn-secondary" title="Refresh">↻</button>
+      </div>
+    </div>
+
+    <div class="dg-regime" id="dg-regime">
+      <span class="dg-regime-dot"></span>
+      <span class="dg-regime-text">loading…</span>
+    </div>
+
+    <div class="dg-totals" id="dg-totals">
+      <div class="dg-stat">
+        <div class="dg-stat-l">DEX <span class="info" data-tip="Dollars of stock dealers hold as a hedge, implied by the book.">i</span></div>
+        <div class="dg-stat-v mono" id="dg-dex">—</div>
+        <div class="dg-stat-s">$ of stock held</div>
+      </div>
+      <div class="dg-stat">
+        <div class="dg-stat-l">GEX <span class="info" data-tip="Dollars of delta dealers must trade for a +1% move in spot. Positive damps volatility, negative amplifies it.">i</span></div>
+        <div class="dg-stat-v mono" id="dg-gex">—</div>
+        <div class="dg-stat-s">$ delta per +1% spot</div>
+      </div>
+      <div class="dg-stat">
+        <div class="dg-stat-l">VEX <span class="info" data-tip="Dealer P&L per +1 implied vol point. Strongly negative into a catalyst means a vol spike forces them to buy options near spot.">i</span></div>
+        <div class="dg-stat-v mono" id="dg-vex">—</div>
+        <div class="dg-stat-s">$ P&L per +1 vol pt</div>
+      </div>
+      <div class="dg-stat">
+        <div class="dg-stat-l">Charm <span class="info" data-tip="Hedge drift from time alone. The mechanism behind OPEX-afternoon drift.">i</span></div>
+        <div class="dg-stat-v mono" id="dg-charm">—</div>
+        <div class="dg-stat-s">$ delta per day</div>
+      </div>
+      <div class="dg-stat">
+        <div class="dg-stat-l">Vanna <span class="info" data-tip="Hedge drift from vol alone. Why a post-event vol crush often comes with a grind up on no news.">i</span></div>
+        <div class="dg-stat-v mono" id="dg-vanna">—</div>
+        <div class="dg-stat-s">$ delta per +1 vol pt</div>
+      </div>
+      <div class="dg-stat">
+        <div class="dg-stat-l">Zero gamma <span class="info" data-tip="The price at which total dealer gamma flips sign, found by re-pricing the whole book across candidate spots — not by cumulative sum, which returns a strike and lands far too low on put-heavy chains.">i</span></div>
+        <div class="dg-stat-v mono" id="dg-flip">—</div>
+        <div class="dg-stat-s" id="dg-flip-sub">re-priced level</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="two-col dg-cols">
+    <section class="panel">
+      <div class="panel-head">
+        <h3>Exposure by strike</h3>
+        <div class="inline-controls">
+          <div class="dg-metric-tabs" id="dg-metric-tabs">
+            <button class="active" data-metric="gex">GEX</button>
+            <button data-metric="dex">DEX</button>
+            <button data-metric="vex">VEX</button>
+            <button data-metric="charm_exp">Charm</button>
+            <button data-metric="vanna_exp">Vanna</button>
+          </div>
+        </div>
+      </div>
+      <div class="chart-wrap tall"><canvas id="dg-chart"></canvas></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h3>Vega concentration</h3>
+        <span class="panel-sub">where a vol move would bite</span>
+      </div>
+      <div class="dg-vex-panel" id="dg-vex-panel">
+        <div class="empty-sm">loading…</div>
+      </div>
+
+      <div class="panel-head" style="margin-top:14px">
+        <h3>Heaviest strikes</h3>
+      </div>
+      <div class="dg-table-wrap">
+        <table class="dg-table" id="dg-table">
+          <thead><tr><th>Strike</th><th>GEX</th><th>DEX</th><th>VEX</th></tr></thead>
+          <tbody><tr><td colspan="4" class="empty-sm">loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <p class="dg-footnote">
+    Every figure above is conditional on the dealer-positioning assumption
+    selected in the toolbar — it is a model input, not an observation.
+    Distinguishing it properly needs trade-level data with an aggressor flag.
+    This describes market structure; it is not a recommendation.
+    <a href="/guide#caveats">More on the assumptions →</a>
+  </p>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/dealer.js"></script>
+{% endblock %}

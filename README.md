@@ -142,18 +142,19 @@ materialise, they stream into per-step histograms and counters.
 `python main.py web` → http://localhost:8501
 
 - **Flow** (`/`) — dashboard with live alerts, scanner output, ticker tape
-- **GEX** (`/heatmap`) — single-ticker GEX bar chart at the front expiry
+- **Dealer** (`/dealer`) — the full exposure surface: DEX / GEX / VEX / charm / vanna per strike, the re-priced zero-gamma level, vega concentration, and a **switchable dealer-positioning convention** — flip it and every sign flips, which is the honest way to present a number most dashboards quote as observed
 - **Seek** (`/heatseeker`) — multi-DTE matrix of strikes as magnitude bars, king/wall annotations
 - **Atlas** (`/atlas`) — intraday GEX node history; strikes render as orb bands that grow as they persist, with a time scrubber to replay the session
 - **Radar** (`/radar`) — composite squeeze scanner across the universe, six layer scores plus a synergy bonus
 - **Brief** (`/brief`) — pre-computed analysis on a background cadence
+- **Symbol** (`/symbol/{sym}`) — price, indicators, options chain, and the per-strike GEX panel (the old standalone `/heatmap` page, folded in — that URL now redirects here)
 - **Watchlist**, **Log**, **Backtest**, **Guide**
 
 ### Selected API endpoints
 
 | Endpoint | Returns |
 |---|---|
-| `/api/dealer_greeks/{sym}` | Full exposure surface; `?convention=naive\|inverted\|all_short`, `?basis=openInterest\|volume` |
+| `/api/dealer_greeks/{sym}` | Full exposure surface; `?convention=naive\|inverted\|all_short`, `?basis=openInterest\|volume`. Rendered by the **Dealer** page. |
 | `/api/projection/{sym}` | Closed-form **and** simulated forward distribution side by side; `?model=gbm\|merton\|bootstrap` |
 | `/api/iv_surface/{sym}` | ATM IV per expiry with quality flags, term-structure shape, 25Δ skew |
 | `/api/mc/validate` | The validation table above, from the running app |

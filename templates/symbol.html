@@ -48,6 +48,56 @@
     </div>
   </section>
 
+  <section class="panel gx-panel" id="gex">
+    <div class="panel-head">
+      <h3>Gamma Exposure by Strike</h3>
+      <span class="panel-sub">
+        Dealer gamma under the standard positioning assumption ·
+        <a href="/dealer">full exposure surface →</a>
+      </span>
+    </div>
+
+    <!-- The symbol is fixed by the page, so the picker and presets that the
+         standalone GEX page carried are omitted. #gx-sym stays as a hidden
+         input because heatmap.js reads the symbol from it. -->
+    <input type="hidden" id="gx-sym" value="{{ symbol }}">
+    <div id="gx-presets" hidden></div>
+
+    <div class="gx-toolbar">
+      <div class="gx-tb-group">
+        <span class="gx-tb-label">DTE</span>
+        <div class="gx-band-btns" id="gx-band">
+          <button data-min="0" data-max="0">0DTE</button>
+          <button data-min="0" data-max="2" class="active">Front</button>
+          <button data-min="7" data-max="30">Mid</button>
+          <button data-min="45" data-max="365">Back</button>
+          <button data-min="0" data-max="365">All</button>
+        </div>
+      </div>
+      <div class="gx-tb-group">
+        <span class="gx-tb-label">Strikes</span>
+        <select id="gx-nstrikes" class="pick">
+          <option value="15">15</option>
+          <option value="25" selected>25</option>
+          <option value="35">35</option>
+          <option value="50">50</option>
+        </select>
+        <button id="gx-refresh" class="btn-secondary" title="Refresh">↻</button>
+        <label class="toggle"><input type="checkbox" id="gx-auto"> <span>auto 60s</span></label>
+      </div>
+    </div>
+
+    <div class="gx-metrics" id="gx-metrics">
+      <div class="gx-stat"><div class="gx-stat-l">Spot</div><div class="gx-stat-v mono" id="gx-spot">—</div><div class="gx-stat-s mono" id="gx-chg">—</div></div>
+      <div class="gx-stat"><div class="gx-stat-l">Net GEX</div><div class="gx-stat-v mono" id="gx-total">—</div><div class="gx-stat-s" id="gx-regime">—</div></div>
+      <div class="gx-stat"><div class="gx-stat-l">Gamma flip</div><div class="gx-stat-v mono" id="gx-flip">—</div><div class="gx-stat-s" id="gx-flip-sub">—</div></div>
+      <div class="gx-stat"><div class="gx-stat-l">Call wall</div><div class="gx-stat-v mono" id="gx-cw">—</div><div class="gx-stat-s">max call OI</div></div>
+      <div class="gx-stat"><div class="gx-stat-l">Put wall</div><div class="gx-stat-v mono" id="gx-pw">—</div><div class="gx-stat-s">max put OI</div></div>
+    </div>
+
+    <div class="chart-wrap tall"><canvas id="gx-chart"></canvas></div>
+  </section>
+
   <div class="two-col">
     <section class="panel">
       <div class="panel-head"><h3>Indicators</h3></div>
@@ -85,4 +135,5 @@
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/symbol.js"></script>
+<script src="/static/js/heatmap.js"></script>
 {% endblock %}

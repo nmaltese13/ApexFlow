@@ -28,7 +28,18 @@ let state = {
   auto: false,
 };
 try { state = { ...state, ...(JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {}) }; } catch {}
-function persist() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }
+
+/* When this panel is embedded on a symbol page the ticker belongs to the
+   page, not to the panel's own saved state — otherwise a stored symbol from
+   a previous visit would silently override the page you are looking at. */
+const PAGE_SYM = document.querySelector('.sym-page')?.dataset.symbol || null;
+if (PAGE_SYM) state.sym = PAGE_SYM.toUpperCase();
+
+function persist() {
+  // Don't let an embedded panel overwrite the standalone view's symbol.
+  const toSave = PAGE_SYM ? { ...state, sym: undefined } : state;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave)); } catch {}
+}
 
 let chart = null;
 let lastData = null;
@@ -49,9 +60,12 @@ const fmtPct = v => (v == null || !isFinite(v)) ? '—' : (v >= 0 ? '+' : '') + 
 
 /* ---------------- toolbar ---------------- */
 function applyState() {
-  document.getElementById('gx-sym').value = state.sym;
-  document.getElementById('gx-nstrikes').value = String(state.n_strikes);
-  document.getElementById('gx-auto').checked = !!state.auto;
+  const symEl = document.getElementById('gx-sym');
+  if (symEl) symEl.value = state.sym;
+  const nEl = document.getElementById('gx-nstrikes');
+  if (nEl) nEl.value = String(state.n_strikes);
+  const autoEl = document.getElementById('gx-auto');
+  if (autoEl) autoEl.checked = !!state.auto;
   document.querySelectorAll('#gx-band button').forEach(b => {
     b.classList.toggle('active',
       parseInt(b.dataset.min, 10) === state.dte_min &&
@@ -64,11 +78,18 @@ function applyState() {
 
 function wireToolbar() {
   const symInp = document.getElementById('gx-sym');
+  // Embedded on a symbol page the input is hidden and fixed, so there is
+  // nothing to wire and the listeners below would never fire anyway.
+  if (!symInp || symInp.type === 'hidden') return wireRest();
   symInp.addEventListener('change', () => {
     const v = symInp.value.trim().toUpperCase();
     if (v) { state.sym = v; persist(); applyState(); load(); }
   });
   symInp.addEventListener('keydown', e => { if (e.key === 'Enter') symInp.blur(); });
+  wireRest();
+}
+
+function wireRest() {
 
   document.querySelectorAll('#gx-presets button').forEach(b => {
     b.addEventListener('click', () => { state.sym = b.dataset.sym; persist(); applyState(); load(); });

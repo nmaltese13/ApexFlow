@@ -5,6 +5,7 @@ Then:    http://localhost:8501
 """
 from __future__ import annotations
 import logging
+from contextlib import asynccontextmanager
 import sys
 import time
 from pathlib import Path
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from fastapi import FastAPI, Request, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -56,7 +57,31 @@ from apexflow.platform.briefing import (
 # -----------------------------------------------------------------------------
 log = logging.getLogger("apexflow.webapp")
 
-app = FastAPI(title="ApexFlow", docs_url=None, redoc_url=None)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start and stop the background engines.
+
+    Replaces four @app.on_event handlers, which FastAPI deprecated and will
+    eventually remove. Each engine is started defensively: a failure in the
+    alerts or briefing loop must not stop the app from serving pages, since
+    every page works fine without them.
+    """
+    for start in (_start_alerts_engine, _start_briefing_engine):
+        try:
+            start()
+        except Exception as e:
+            log.warning("%s failed at startup: %s", start.__name__, e)
+    try:
+        yield
+    finally:
+        for stop in (_stop_alerts_engine, _stop_briefing_engine):
+            try:
+                stop()
+            except Exception as e:
+                log.warning("%s failed at shutdown: %s", stop.__name__, e)
+
+
+app = FastAPI(title="ApexFlow", docs_url=None, redoc_url=None, lifespan=lifespan)
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
 app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 
@@ -116,9 +141,19 @@ def page_dashboard(request: Request):
 
 
 @app.get("/heatmap")
-def page_heatmap(request: Request):
-    return templates.TemplateResponse(request, "heatmap.html",
-        {**_base_ctx(request), "page": "heatmap"})
+def page_heatmap_redirect(sym: str = "SPY"):
+    """Retired: the per-strike GEX view now lives on the symbol page.
+
+    Kept as a redirect rather than deleted so bookmarks and the browser
+    history of anyone who used it keep working.
+    """
+    return RedirectResponse(f"/symbol/{sym.upper()}#gex", status_code=308)
+
+
+@app.get("/dealer")
+def page_dealer(request: Request):
+    return templates.TemplateResponse(request, "dealer.html",
+        {**_base_ctx(request), "page": "dealer"})
 
 
 @app.get("/heatseeker")
@@ -165,11 +200,20 @@ def page_watchlist(request: Request):
 
 
 @app.get("/log")
-def page_log(request: Request):
+def page_log(request: Request, limit: int = 50):
+    """Recent signals.
+
+    Renders `limit` rows server-side. The default was 200, which shipped a
+    ~113KB HTML document on every page load for a view where nobody reads
+    past the first screen — the tail is available through /api/log, which is
+    what a "load more" control should call.
+    """
+    limit = max(10, min(limit, 500))
     sl = SignalLogger()
-    records = list(sl.iter_recent(200))
+    records = list(sl.iter_recent(limit))
     return templates.TemplateResponse(request, "log.html",
-        {**_base_ctx(request), "page": "log", "records": records[::-1]})
+        {**_base_ctx(request), "page": "log",
+         "records": records[::-1], "limit": limit})
 
 
 @app.get("/symbol/{sym}")
@@ -1546,7 +1590,6 @@ def _alerts_profile() -> dict:
             "startup_delay": 30.0}
 
 
-@app.on_event("startup")
 def _start_alerts_engine() -> None:
     global _alerts_engine
     prof = _alerts_profile()
@@ -1567,7 +1610,6 @@ def _start_alerts_engine() -> None:
     _alerts_engine.start()
 
 
-@app.on_event("shutdown")
 def _stop_alerts_engine() -> None:
     if _alerts_engine:
         _alerts_engine.stop()
@@ -1584,7 +1626,6 @@ def get_briefing_engine() -> BriefingEngine | None:
     return _briefing_engine
 
 
-@app.on_event("startup")
 def _start_briefing_engine() -> None:
     import os
     if os.environ.get("APEXFLOW_BRIEFING_DISABLE"):
@@ -1604,7 +1645,6 @@ def _start_briefing_engine() -> None:
     _briefing_engine.start()
 
 
-@app.on_event("shutdown")
 def _stop_briefing_engine() -> None:
     if _briefing_engine:
         _briefing_engine.stop()

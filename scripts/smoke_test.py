@@ -29,7 +29,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import webapp  # noqa: E402
 
 PAGES = [
-    "/", "/heatmap", "/heatseeker", "/atlas", "/radar", "/brief",
+    "/", "/dealer", "/heatseeker", "/atlas", "/radar", "/brief",
     "/earnings", "/guide", "/watchlist", "/log", "/backtest", "/symbol/SPY",
 ]
 
