@@ -22,6 +22,55 @@ Total to run a *real* setup: about **$110–$150/mo** at Tiers 1–4. Skip Tier
 
 ---
 
+## Keyless sources actually in use
+
+Every one of these was probed and verified working; none needs an account.
+
+| Source | Provides | Used for |
+|---|---|---|
+| **Cboe** delayed quotes | Full option chain, exchange-computed IV + Greeks, all expiries in **one** request. Covers SPX/VIX. | The default options provider |
+| **FINRA** consolidated short interest | Shares short, ADV, days-to-cover, twice monthly back to 2020 | Point-in-time squeeze backtest |
+| **SEC EDGAR** XBRL | Shares outstanding stamped with the **filed** date | Short-%-of-float, point-in-time |
+| **US Treasury** par yield curve | Full curve daily, 1M to 30Y | Tenor-matched risk-free rate |
+| **Nasdaq Trader** symbol directory | ~5,600 listed symbols with ETF / test-issue flags | Universe construction |
+
+SEC is the only one wanting anything from you: a contact email in the
+User-Agent (`APEXFLOW_SEC_USER_AGENT`), which is their published policy.
+There is deliberately no default — see `providers/shortinterest_provider.py`.
+
+### Probed and rejected
+
+Worth recording so nobody re-checks them:
+
+| Source | Why not |
+|---|---|
+| IBKR shortable-instruments file | The public `usa.txt` path 404s and the FTP mirror times out. **Borrow rate remains genuinely paid-only.** |
+| Stooq CSV | JavaScript-gated; returns a browser-check page, not data |
+| FRED `fredgraph.csv` | Intermittently unreachable. Treasury's own feed covers the same need more directly |
+| Cboe market-statistics JSON | 403 on the daily put/call and volume endpoints |
+
+### Free tiers that need a signup
+
+Not wired in, listed for completeness. Each needs an account and a key, and
+none was verified here — treat the limits as documented rather than tested:
+
+| Service | Free tier | Would add |
+|---|---|---|
+| **Alpaca** | IEX real-time, generous | Real-time equity quotes; IEX-only depth |
+| **Tiingo** | ~50 symbols/hr | Clean EOD history, fundamentals |
+| **Twelve Data** | 800 req/day | Quotes + some fundamentals |
+| **Alpha Vantage** | 25 req/day | Very restrictive at this point |
+| **Polygon** | 5 req/min | Same data as the paid tier, throttled hard |
+| **Finnhub** | 60 req/min | Earnings calendar + news (already wired) |
+
+The honest summary: **for options specifically, the free keyless path is now
+about as good as it gets short of paying.** Cboe gives exchange-computed IV
+and Greeks, which is the thing that actually limits analysis quality. The
+remaining gaps are borrow rate and true free float, and neither is available
+free from any source found.
+
+---
+
 ## The $0 path, in detail
 
 There are two free modes, and they answer different questions.

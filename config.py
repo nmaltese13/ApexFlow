@@ -74,6 +74,13 @@ def demo_dataset_present() -> bool:
 CBOE_ENABLED = os.environ.get("APEXFLOW_DISABLE_CBOE", "").lower() not in ("1", "true", "yes", "on")
 
 
+# ---- Risk-free rate ---------------------------------------------------------
+# Pull the Treasury par yield curve (free, no key) and match the rate to each
+# contract's tenor instead of assuming a flat 4%. Set APEXFLOW_STATIC_RATE=1
+# to keep the old constant — useful for reproducible offline runs.
+LIVE_RATES = os.environ.get("APEXFLOW_STATIC_RATE", "").lower() not in ("1", "true", "yes", "on")
+
+
 # ---- Universe defaults ------------------------------------------------------
 DEFAULT_UNIVERSE = os.environ.get("APEXFLOW_UNIVERSE", "sp100")
 

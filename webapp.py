@@ -36,6 +36,7 @@ from apexflow.analytics.projection import (
     projection_cone as proj_cone, horizon_years,
 )
 from apexflow.analytics import montecarlo as mc
+from apexflow.analytics.rates import risk_free_rate
 from apexflow.analytics.iv_surface import (
     atm_iv as robust_atm_iv, first_usable_atm_iv, iv_term_structure,
     risk_reversal_25d,
@@ -64,6 +65,23 @@ app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 # Tiny in-memory cache (provider already caches; this avoids repeating scans)
 # -----------------------------------------------------------------------------
 _cache: dict[str, tuple[float, Any]] = {}
+
+def rate_for(t_years: float) -> float:
+    """Tenor-matched risk-free rate, or the static default when disabled.
+
+    Second-order next to the IV and positioning assumptions, but free to get
+    right — and rho is meaningless computed against a stale constant.
+    """
+    if not getattr(config, "LIVE_RATES", True):
+        from apexflow.analytics.rates import FALLBACK_RATE
+        return FALLBACK_RATE
+    try:
+        return risk_free_rate(t_years)
+    except Exception as e:          # never let a rate lookup break a request
+        log.warning("risk-free rate lookup failed: %s", e)
+        from apexflow.analytics.rates import FALLBACK_RATE
+        return FALLBACK_RATE
+
 
 def _opt_float(v) -> float | None:
     """float(), but preserves None instead of raising."""
@@ -555,7 +573,8 @@ def api_dealer_greeks(sym: str, dte_max: int = 30, convention: str = "naive",
             puts_df = puts if puts is not None else pd.DataFrame()
             raw.append((exp, calls, puts_df))
             frames.append(chain_exposures(calls, puts_df, spot, exp,
-                                          convention=convention, oi_col=basis))
+                                          convention=convention, oi_col=basis,
+                                          r=rate_for(years_to_expiry(exp))))
         if not frames or spot <= 0:
             return {"symbol": sym, "spot": spot, "strikes": [], "summary": {},
                     "vex": {}, "expiries_used": used}
@@ -565,7 +584,8 @@ def api_dealer_greeks(sym: str, dte_max: int = 30, convention: str = "naive",
         vex = vex_summary(rolled, spot)
 
         try:
-            flip = gamma_flip_level(raw, spot, convention=convention)
+            flip = gamma_flip_level(raw, spot, convention=convention,
+                                    r=rate_for(years_to_expiry(used[0])))
             summary["gamma_flip"] = flip.get("flip")
             summary["gamma_flip_bracketed"] = flip.get("bracketed", False)
             summary["regime"] = flip.get("regime", summary.get("regime"))
@@ -810,6 +830,10 @@ def api_projection(sym: str, dte_max: int = 7, horizon_days: float = 1.0,
 
         # Horizon
         t = horizon_years(horizon_days)
+        # Named `rf`, not `r`: the gamma-wall loop below binds `r` to each
+        # DataFrame row, and shadowing the rate there silently passes a
+        # pandas Series into the pricing maths.
+        rf = rate_for(t)
         em = proj_em(spot, t, atm_iv) if atm_iv > 0 else 0.0
         em_pct = (em / spot * 100) if spot else 0.0
 
@@ -831,8 +855,8 @@ def api_projection(sym: str, dte_max: int = 7, horizon_days: float = 1.0,
                     "put_gex":    float(r["put_gex"]),
                     "total_gex":  float(r["total_gex"]),
                     "dist_pct":   float((K / spot - 1) * 100) if spot else 0.0,
-                    "above_prob": proj_above(spot, K, t, atm_iv) if atm_iv > 0 else 0.5,
-                    "touch_prob": proj_touch(spot, K, t, atm_iv) if atm_iv > 0 else 0.5,
+                    "above_prob": proj_above(spot, K, t, atm_iv, rf) if atm_iv > 0 else 0.5,
+                    "touch_prob": proj_touch(spot, K, t, atm_iv, rf) if atm_iv > 0 else 0.5,
                     "sigma_dist": float((K - spot) / em) if em > 0 else 0.0,
                 })
 
@@ -843,12 +867,12 @@ def api_projection(sym: str, dte_max: int = 7, horizon_days: float = 1.0,
         flip_detail = {}
         if raw_chains:
             try:
-                flip_detail = gamma_flip_level(raw_chains, spot)
+                flip_detail = gamma_flip_level(raw_chains, spot, r=rf)
                 flip = flip_detail.get("flip")
             except Exception as e:
                 log.warning("gamma_flip_level failed for %s: %s", sym, e)
 
-        cone = proj_cone(spot, t, atm_iv, n_steps=30) if atm_iv > 0 else []
+        cone = proj_cone(spot, t, atm_iv, n_steps=30, r=rf) if atm_iv > 0 else []
 
         out = {
             "symbol": sym,
@@ -858,6 +882,7 @@ def api_projection(sym: str, dte_max: int = 7, horizon_days: float = 1.0,
             "atm_iv_expiry": iv_expiry,
             "horizon_days": float(horizon_days),
             "horizon_years": float(t),
+            "risk_free_rate": float(rf),
             "expected_move": float(em),
             "expected_move_pct": float(em_pct),
             "expiries_used": used,
@@ -882,7 +907,7 @@ def api_projection(sym: str, dte_max: int = 7, horizon_days: float = 1.0,
             try:
                 out["mc"] = _run_projection_mc(
                     spot, t, atm_iv, strike_list, df["Close"],
-                    model=model, paths=paths, steps=steps)
+                    model=model, paths=paths, steps=steps, r=rf)
             except Exception as e:
                 log.warning("Monte Carlo failed for %s: %s", sym, e)
                 out["mc"] = {"error": str(e)}
@@ -892,7 +917,8 @@ def api_projection(sym: str, dte_max: int = 7, horizon_days: float = 1.0,
 
 
 def _run_projection_mc(spot: float, t: float, iv: float, strikes: list[float],
-                       closes, model: str, paths: int, steps: int) -> dict:
+                       closes, model: str, paths: int, steps: int,
+                       r: float = 0.04) -> dict:
     """Simulate the forward distribution and the gamma-wall touch probabilities.
 
     Path counts are capped here so a browser refresh cannot pin a core; the
@@ -923,11 +949,11 @@ def _run_projection_mc(spot: float, t: float, iv: float, strikes: list[float],
 
     cfg = mc.MCConfig(n_paths=paths, n_steps=steps, model=model,
                       chunk_paths=min(paths, 100_000), **kwargs)
-    res = mc.simulate_cone(spot, t, iv, cfg)
+    res = mc.simulate_cone(spot, t, iv, cfg, r=r)
     payload = res.to_dict()
 
     if strikes:
-        touch = mc.touch_probabilities(spot, strikes, t, iv, cfg)
+        touch = mc.touch_probabilities(spot, strikes, t, iv, cfg, r=r)
         payload["walls"] = [{
             "strike": float(k),
             "touch_prob": touch[k]["touch"],

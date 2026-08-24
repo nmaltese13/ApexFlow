@@ -49,6 +49,7 @@ python main.py validate-mc                    # check the simulator against clos
 | [`greeks.py`](apexflow/analytics/greeks.py) | Black–Scholes–Merton Greeks; bracketed Newton/bisection IV solver with no-arbitrage rejection |
 | [`gex.py`](apexflow/analytics/gex.py) | Per-strike gamma exposure (a thin adapter over `dealer_greeks`, so the two cannot disagree) |
 | [`gex_profile.py`](apexflow/analytics/gex_profile.py) | Classifies the gamma landscape: walls, pillars, slides, pins, negative-gamma zones |
+| [`rates.py`](apexflow/analytics/rates.py) | Tenor-matched risk-free rate from the Treasury par yield curve — free, keyless, replaces a hardcoded 4% |
 | [`timeutil.py`](apexflow/analytics/timeutil.py) | Single source of truth for time-to-expiry — DST-correct 16:00 ET close via `zoneinfo` |
 | [`squeeze.py`](apexflow/analytics/squeeze.py) | Composite short-squeeze pressure score, piecewise-linear (no bucket cliffs) |
 | [`squeeze_backtest.py`](apexflow/platform/squeeze_backtest.py) | Cross-sectional rank-IC evaluation of that score, with a permutation null, overlap correction, and a coverage gate that refuses under-powered verdicts |
@@ -225,6 +226,7 @@ actually fixes: [`docs/data_sources.md`](docs/data_sources.md).
 | `APEXFLOW_DEMO=1` | Use the frozen snapshot (same as `--demo`) |
 | `APEXFLOW_SEC_USER_AGENT` | `"Your Name you@example.com"` — required by the SEC for share counts |
 | `APEXFLOW_DISABLE_CBOE=1` | Fall back to yfinance for options |
+| `APEXFLOW_STATIC_RATE=1` | Use a flat 4% instead of the live Treasury curve |
 | `APEXFLOW_DEMO_SHIFT=0` | Show raw captured dates instead of shifting them forward |
 | `APEXFLOW_ATLAS_DISABLE=1` | Skip the Atlas snapshot loop |
 | `APEXFLOW_BRIEFING_DISABLE=1` | Skip the briefing engine |

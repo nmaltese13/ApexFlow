@@ -731,9 +731,12 @@ the top dominate everything below them.
    free source to Cboe (exchange-computed IV and Greeks, whole chain in one
    keyless request) the *quality* problem is much reduced, but the delay
    remains. See [`data_sources.md`](data_sources.md).
-9. **`r` defaults to 4% and `q` to 0** unless a caller passes otherwise.
-   Both are second-order for short horizons but not for LEAPS or for
-   high-yield names.
+9. **`q` (dividend yield) defaults to 0** unless a caller passes otherwise —
+   second-order for short horizons, not for high-yield names. `r` is no
+   longer hardcoded: `analytics/rates.py` pulls the Treasury par yield curve
+   (free, keyless) and matches the rate to each contract's tenor, falling
+   back to 4% only when the curve cannot be fetched. Library function
+   defaults remain 4% so offline use is unchanged; the API resolves live.
 
 ---
 
