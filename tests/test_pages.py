@@ -98,16 +98,30 @@ class TestRetiredHeatmapRoute:
 
 
 class TestLogPayload:
+    """The signal log is runtime state and is gitignored, so a fresh clone
+    has none. These assertions therefore must not depend on rows existing —
+    an earlier version compared two page sizes and passed only on a machine
+    that happened to have a populated log."""
+
     def test_default_is_capped(self, client):
         """Was 200 rows / ~113KB on every load."""
-        body = client.get("/log").text
-        assert len(body) < 60_000
+        assert len(client.get("/log").text) < 60_000
 
-    def test_limit_is_honoured_and_bounded(self, client):
-        assert len(client.get("/log?limit=200").text) > len(client.get("/log?limit=20").text)
-        # Out-of-range values clamp instead of erroring.
-        assert client.get("/log?limit=99999").status_code == 200
-        assert client.get("/log?limit=-5").status_code == 200
+    def test_out_of_range_limits_clamp_instead_of_erroring(self, client):
+        for limit in (-5, 0, 1, 99999):
+            assert client.get(f"/log?limit={limit}").status_code == 200
+
+    def test_default_limit_is_fifty(self):
+        """Pin the cap directly rather than inferring it from page size."""
+        import inspect
+        sig = inspect.signature(webapp.page_log)
+        assert sig.parameters["limit"].default == 50
+
+    def test_a_larger_limit_returns_at_least_as_much(self, client):
+        """Weak by necessity: with an empty log both are the same size."""
+        small = len(client.get("/log?limit=10").text)
+        large = len(client.get("/log?limit=200").text)
+        assert large >= small
 
 
 class TestNoDeadAssets:
