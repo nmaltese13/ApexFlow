@@ -17,8 +17,8 @@ os.environ.setdefault("APEXFLOW_BRIEFING_DISABLE", "1")
 from fastapi.testclient import TestClient  # noqa: E402
 import webapp  # noqa: E402
 
-PAGES = ["/", "/dealer", "/heatseeker", "/atlas", "/radar", "/brief",
-         "/earnings", "/guide", "/watchlist", "/log", "/backtest", "/symbol/SPY"]
+PAGES = ["/", "/dealer", "/heatseeker", "/vol", "/atlas", "/radar", "/brief",
+         "/earnings", "/journal", "/guide", "/symbol/SPY"]
 
 
 @pytest.fixture(scope="module")
@@ -99,6 +99,46 @@ class TestRetiredHeatmapRoute:
         assert 'href="/heatmap"' not in client.get("/").text
 
 
+class TestRetiredPages:
+    """Merged or removed pages must redirect, never 404."""
+
+    @pytest.mark.parametrize("path,target", [
+        ("/watchlist", "/journal"),
+        ("/log", "/journal?limit=50"),
+        ("/backtest", "/guide#backtesting"),
+        ("/heatmap", "/symbol/SPY#gex"),
+    ])
+    def test_redirects(self, client, path, target):
+        r = client.get(path, follow_redirects=False)
+        assert r.status_code == 308
+        assert r.headers["location"] == target
+
+    @pytest.mark.parametrize("path", ["/watchlist", "/log", "/backtest", "/heatmap"])
+    def test_following_lands_somewhere_real(self, client, path):
+        assert client.get(path).status_code == 200
+
+    def test_journal_carries_both_former_pages(self, client):
+        body = client.get("/journal").text
+        assert "Watchlist" in body and "Signal Log" in body
+        assert 'id="jr-watchlist"' in body and 'id="jr-log"' in body
+
+    def test_guide_has_the_backtesting_target(self, client):
+        assert 'id="backtesting"' in client.get("/guide").text
+
+
+class TestVolPage:
+    def test_has_what_its_js_needs(self, client):
+        body = client.get("/vol").text
+        for element_id in ("vl-sym", "vl-count", "vl-chart", "vl-table",
+                           "vl-shape", "vl-rr"):
+            assert f'id="{element_id}"' in body, f"missing #{element_id}"
+
+    def test_explains_the_confidence_flag(self, client):
+        body = client.get("/vol").text.lower()
+        assert "confidence" in body
+        assert "factor of four" in body      # the reason the flag exists
+
+
 class TestLogPayload:
     """The signal log is runtime state and is gitignored, so a fresh clone
     has none. These assertions therefore must not depend on rows existing —
@@ -107,22 +147,22 @@ class TestLogPayload:
 
     def test_default_is_capped(self, client):
         """Was 200 rows / ~113KB on every load."""
-        assert len(client.get("/log").text) < 60_000
+        assert len(client.get("/journal").text) < 120_000
 
     def test_out_of_range_limits_clamp_instead_of_erroring(self, client):
         for limit in (-5, 0, 1, 99999):
-            assert client.get(f"/log?limit={limit}").status_code == 200
+            assert client.get(f"/journal?limit={limit}").status_code == 200
 
     def test_default_limit_is_fifty(self):
         """Pin the cap directly rather than inferring it from page size."""
         import inspect
-        sig = inspect.signature(webapp.page_log)
+        sig = inspect.signature(webapp.page_journal)
         assert sig.parameters["limit"].default == 50
 
     def test_a_larger_limit_returns_at_least_as_much(self, client):
         """Weak by necessity: with an empty log both are the same size."""
-        small = len(client.get("/log?limit=10").text)
-        large = len(client.get("/log?limit=200").text)
+        small = len(client.get("/journal?limit=10").text)
+        large = len(client.get("/journal?limit=200").text)
         assert large >= small
 
 
@@ -161,13 +201,18 @@ class TestNoDeadAssets:
         """The token must actually track file state, not be a constant."""
         first = webapp.asset_version()
         assert first and first != "0"
-        js = Path(webapp.__file__).resolve().parent / "static" / "js" / "apex.js"
+        static = Path(webapp.__file__).resolve().parent / "static"
+        js = static / "js" / "apex.js"
         original = js.stat().st_mtime
         try:
-            # Must exceed *every* other asset's mtime, since the token is a
-            # max() across all of them — a small bump on a file that is not
-            # already the newest changes nothing.
-            bumped = original + 86_400
+            # The token is a max() across every asset, so the bump has to
+            # clear the current newest file — not merely be "large". A fixed
+            # offset fails whenever the spread between files happens to
+            # exceed it, which is exactly how this test first went wrong.
+            newest = max(f.stat().st_mtime
+                         for pattern in ("js/*.js", "css/*.css")
+                         for f in static.glob(pattern))
+            bumped = newest + 3600
             os.utime(js, (bumped, bumped))
             assert webapp.asset_version() != first
         finally:

@@ -209,6 +209,12 @@ def page_atlas(request: Request):
         {**_base_ctx(request), "page": "atlas"})
 
 
+@app.get("/vol")
+def page_vol(request: Request):
+    return templates.TemplateResponse(request, "vol.html",
+        {**_base_ctx(request), "page": "vol"})
+
+
 @app.get("/radar")
 def page_radar(request: Request):
     return templates.TemplateResponse(request, "radar.html",
@@ -233,15 +239,34 @@ def page_guide(request: Request):
         {**_base_ctx(request), "page": "guide"})
 
 
+@app.get("/journal")
+def page_journal(request: Request, limit: int = 50):
+    """Watchlist and signal log on one page.
+
+    Two thin list views merged: both answered "what has this thing flagged
+    recently", neither justified its own nav slot, and keeping them apart
+    meant checking two places for one question.
+    """
+    limit = max(10, min(limit, 500))
+    return templates.TemplateResponse(request, "journal.html",
+        {**_base_ctx(request), "page": "journal",
+         "entries": Watchlist().list(),
+         "records": list(SignalLogger().iter_recent(limit))[::-1],
+         "limit": limit})
+
+
 @app.get("/watchlist")
-def page_watchlist(request: Request):
-    wl = Watchlist().list()
-    return templates.TemplateResponse(request, "watchlist.html",
-        {**_base_ctx(request), "page": "watchlist", "entries": wl})
+def page_watchlist_redirect():
+    return RedirectResponse("/journal", status_code=308)
 
 
 @app.get("/log")
 def page_log(request: Request, limit: int = 50):
+    """Retired in favour of /journal, kept as a redirect for bookmarks."""
+    return RedirectResponse(f"/journal?limit={limit}", status_code=308)
+
+
+def _page_log_unused(request: Request, limit: int = 50):
     """Recent signals.
 
     Renders `limit` rows server-side. The default was 200, which shipped a
@@ -264,15 +289,16 @@ def page_symbol(request: Request, sym: str):
 
 
 @app.get("/backtest")
-def page_backtest(request: Request):
-    from apexflow.platform.backtest import SUPPORTED_SCANNERS, UNSUPPORTED_REASON
-    return templates.TemplateResponse(request, "backtest.html",
-        {**_base_ctx(request), "page": "backtest",
-         # Only offer what can actually be replayed; listing the rest just
-         # invites an error the user cannot do anything about.
-         "scanners": sorted(s for s in ALL_SCANNERS if s in SUPPORTED_SCANNERS),
-         "unsupported": {s: UNSUPPORTED_REASON.get(s, "")
-                         for s in sorted(ALL_SCANNERS) if s not in SUPPORTED_SCANNERS}})
+def page_backtest_redirect():
+    """Retired.
+
+    The page only replayed three price-based scanners, which is the weakest
+    question this project can ask. The real validation work — the
+    cross-sectional rank test with a permutation null and a coverage gate —
+    lives in `python main.py backtest-squeeze`, and a browser form was never
+    going to represent it honestly. The Guide explains both.
+    """
+    return RedirectResponse("/guide#backtesting", status_code=308)
 
 
 # -----------------------------------------------------------------------------

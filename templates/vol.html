@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %} · Volatility{% endblock %}
+{% block content %}
+
+<div class="dash vol-page">
+
+  <section class="panel">
+    <div class="panel-head">
+      <h3>Volatility Surface</h3>
+      <span class="panel-sub">Term structure and skew, with a confidence flag on every point</span>
+    </div>
+
+    <div class="dg-toolbar">
+      <div class="dg-tb-group">
+        <input id="vl-sym" class="gx-sym-input" type="text" value="SPY" maxlength="6"
+               placeholder="SYM" autocomplete="off" spellcheck="false">
+        <div class="gx-presets" id="vl-presets">
+          <button data-sym="SPY">SPY</button>
+          <button data-sym="QQQ">QQQ</button>
+          <button data-sym="NVDA">NVDA</button>
+          <button data-sym="TSLA">TSLA</button>
+          <button data-sym="AMD">AMD</button>
+          <button data-sym="GME">GME</button>
+        </div>
+      </div>
+      <div class="dg-tb-group">
+        <span class="gx-tb-label">Expiries</span>
+        <select id="vl-count" class="pick">
+          <option value="6">6</option>
+          <option value="8" selected>8</option>
+          <option value="12">12</option>
+          <option value="16">16</option>
+        </select>
+        <button id="vl-refresh" class="btn-secondary" title="Refresh">↻</button>
+      </div>
+      <div class="dg-tb-group">
+        <label class="toggle">
+          <input type="checkbox" id="vl-showpoor">
+          <span>show low-confidence points</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="dg-regime" id="vl-shape">
+      <span class="dg-regime-dot"></span>
+      <span class="dg-regime-text">loading…</span>
+    </div>
+
+    <div class="dg-totals">
+      <div class="dg-stat">
+        <div class="dg-stat-l">ATM IV</div>
+        <div class="dg-stat-v mono" id="vl-atm">—</div>
+        <div class="dg-stat-s" id="vl-atm-sub">—</div>
+      </div>
+      <div class="dg-stat">
+        <div class="dg-stat-l">Front</div>
+        <div class="dg-stat-v mono" id="vl-front">—</div>
+        <div class="dg-stat-s">nearest usable expiry</div>
+      </div>
+      <div class="dg-stat">
+        <div class="dg-stat-l">Back</div>
+        <div class="dg-stat-v mono" id="vl-back">—</div>
+        <div class="dg-stat-s">furthest usable expiry</div>
+      </div>
+      <div class="dg-stat">
+        <div class="dg-stat-l">25Δ risk reversal
+          <span class="info" data-tip="25-delta put IV minus 25-delta call IV, in vol points. Positive means downside protection is bid relative to upside — the normal state for an index. Strikes are picked by computed delta, not a fixed % from spot, so it compares across tickers.">i</span>
+        </div>
+        <div class="dg-stat-v mono" id="vl-rr">—</div>
+        <div class="dg-stat-s" id="vl-rr-sub">—</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="two-col">
+    <section class="panel">
+      <div class="panel-head">
+        <h3>Term structure</h3>
+        <span class="panel-sub">ATM IV by days to expiry</span>
+      </div>
+      <div class="chart-wrap"><canvas id="vl-chart"></canvas></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h3>By expiry</h3>
+        <span class="panel-sub">confidence, not just a number</span>
+      </div>
+      <div class="dg-table-wrap">
+        <table class="dg-table" id="vl-table">
+          <thead><tr><th>Expiry</th><th>DTE</th><th>ATM IV</th><th>Samples</th><th>Confidence</th></tr></thead>
+          <tbody><tr><td colspan="5" class="empty-sm">loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <p class="dg-footnote">
+    Each expiry's implied vol is a vega-weighted median of the tradeable
+    strikes near the money, not a single strike's quoted figure — near-expiry
+    contracts routinely quote implied vols that disagree by a factor of four
+    across adjacent strikes, and picking one of them is a coin flip that
+    propagates into every probability downstream. Points flagged
+    <em>low</em> failed that test and are hidden by default.
+    <a href="/guide#caveats">How this is computed →</a>
+  </p>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/vol.js?v={{ asset_v }}"></script>
+{% endblock %}

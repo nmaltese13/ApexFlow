@@ -1926,3 +1926,51 @@ input:focus-visible, .navlink:focus-visible {
   font-size: 12px; color: var(--txt-2); line-height: 1.6;
 }
 .rk-refuse strong { color: var(--red); }
+
+/* =========================================================================
+   NAV GROUPING
+   Eleven flat items gave no sense of what belonged together. Three labelled
+   groups: what the market looks like, what to look at, what happened.
+   ========================================================================= */
+.nav-group-label {
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--txt-faint);
+  padding: 12px 0 5px; margin: 0 10px;
+  border-top: 1px solid var(--line);
+}
+.nav-group-label:first-of-type { border-top: none; padding-top: 4px; }
+
+/* =========================================================================
+   VOLATILITY PAGE
+   ========================================================================= */
+.conf-chip {
+  display: inline-block; padding: 1px 6px; border-radius: 3px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.conf-good { color: var(--green); background: var(--green-soft); border: 1px solid rgba(41,216,150,0.3); }
+.conf-fair { color: var(--amber); background: var(--amber-soft); border: 1px solid rgba(255,181,71,0.3); }
+.conf-poor { color: var(--red);   background: var(--red-soft);   border: 1px solid rgba(255,82,111,0.3); }
+.dg-table tr.row-dim td { opacity: 0.5; }
+
+/* =========================================================================
+   JOURNAL — watchlist + signal log as tabs
+   ========================================================================= */
+.jr-tabs { display: flex; gap: 2px; margin-bottom: 12px; }
+.jr-tab {
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--txt-mute);
+  font-size: 12px; font-weight: 600; padding: 8px 16px; cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; gap: 7px;
+  transition: color .12s, background .12s, border-color .12s;
+}
+.jr-tab:hover { color: var(--txt-2); }
+.jr-tab.active {
+  background: var(--accent-glow); color: var(--accent); border-color: var(--accent-deep);
+}
+.jr-count {
+  font-size: 10px; padding: 0 5px; border-radius: 99px;
+  background: rgba(255,255,255,0.07); font-variant-numeric: tabular-nums;
+}
+.jr-scroll { max-height: 68vh; overflow: auto; }
+.jr-scroll thead th { position: sticky; top: 0; background: var(--bg-1); z-index: 2; }

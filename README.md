@@ -167,14 +167,24 @@ materialise, they stream into per-step histograms and counters.
 
 `python main.py web` → http://localhost:8501
 
+Nav is grouped into **Structure** (what the market looks like), **Screening**
+(what to look at) and **Record** (what happened).
+
 - **Flow** (`/`) — dashboard with live alerts, scanner output, ticker tape
 - **Dealer** (`/dealer`) — the full exposure surface: DEX / GEX / VEX / charm / vanna per strike, the re-priced zero-gamma level, vega concentration, and a **switchable dealer-positioning convention** — flip it and every sign flips, which is the honest way to present a number most dashboards quote as observed
 - **Seek** (`/heatseeker`) — multi-DTE matrix of strikes as magnitude bars, king/wall annotations
+- **Vol** (`/vol`) — implied-vol term structure and 25Δ skew, with a **confidence flag on every expiry**: near-expiry contracts routinely quote IVs that disagree by a factor of four across adjacent strikes, and points that fail that test are hidden rather than plotted next to good ones
 - **Atlas** (`/atlas`) — intraday GEX node history; strikes render as orb bands that grow as they persist, with a time scrubber to replay the session
 - **Radar** (`/radar`) — composite squeeze scanner across the universe, six layer scores plus a synergy bonus
 - **Brief** (`/brief`) — pre-computed analysis on a background cadence
 - **Symbol** (`/symbol/{sym}`) — price, indicators, options chain, and the per-strike GEX panel (the old standalone `/heatmap` page, folded in — that URL now redirects here)
-- **Watchlist**, **Log**, **Backtest**, **Guide**
+- **Journal** (`/journal`) — watchlist and signal log as two tabs (they were separate pages answering the same question)
+- **Guide** (`/guide`) — how every number is computed, plus the backtesting commands
+
+Retired, all redirecting rather than 404ing: `/heatmap` → the symbol page,
+`/watchlist` and `/log` → `/journal`, `/backtest` → the Guide (the page only
+replayed three price-based scanners; the real validation is
+`backtest-squeeze` in the CLI).
 
 ### Selected API endpoints
 

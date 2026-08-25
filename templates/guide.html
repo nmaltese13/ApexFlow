@@ -309,6 +309,45 @@
     </ol>
 
     <!-- =================================================================== -->
+    <!-- =================================================================== -->
+    <h2 id="backtesting">Backtesting</h2>
+    <p>
+      There used to be a Backtest page here. It replayed three price-based
+      scanners against historical bars, which is the weakest question this
+      project can ask, and a browser form was never going to represent the
+      real work honestly. Both now live in the CLI.
+    </p>
+    <div class="setup-grid">
+      <div class="setup-card">
+        <h4>Scanner replay <span class="setup-tag range">weak</span></h4>
+        <p>Replays a scanner's boolean daily signal against price bars.</p>
+        <div class="setup-cue"><code>python main.py backtest pre-breakout --hold 5</code></div>
+      </div>
+      <div class="setup-card">
+        <h4>Squeeze score <span class="setup-tag bull">the real test</span></h4>
+        <p>
+          Cross-sectional rank test with a permutation null, an overlap
+          correction, and a coverage gate that refuses a verdict when most of
+          the score cannot be reconstructed point-in-time.
+        </p>
+        <div class="setup-cue"><code>python main.py backtest-squeeze --universe squeeze</code></div>
+      </div>
+      <div class="setup-card">
+        <h4>Monte Carlo <span class="setup-tag fade">validation</span></h4>
+        <p>Prices options, digitals and a barrier by simulation and compares each against closed form.</p>
+        <div class="setup-cue"><code>python main.py validate-mc</code></div>
+      </div>
+    </div>
+    <p class="note">
+      What the squeeze backtest actually found: no rank information
+      (IC −0.049, inside the permutation null), but the top score decile
+      produced a mean return of +14.5% against a median of −1.6%, and the
+      rate of &gt;20% moves rose from 7.2% to 13.0% across deciles. A
+      right-tailed payoff that a rank statistic cannot represent — which is
+      a different claim from "it works", and is written up in full in
+      <code>docs/methodology.md</code> §10.
+    </p>
+
     <h2 id="caveats">Caveats</h2>
     <ul>
       <li><strong>Free data is delayed.</strong> The free yfinance feed is ~15-min delayed and doesn't include real-time flow / dark-pool prints. For live tape add a paid provider key to <code>keys.py</code>.</li>

@@ -29,8 +29,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 import webapp  # noqa: E402
 
 PAGES = [
-    "/", "/dealer", "/heatseeker", "/atlas", "/radar", "/brief",
-    "/earnings", "/guide", "/watchlist", "/log", "/backtest", "/symbol/SPY",
+    "/", "/dealer", "/heatseeker", "/vol", "/atlas", "/radar", "/brief",
+    "/earnings", "/journal", "/guide", "/symbol/SPY",
 ]
 
 API = [
@@ -52,6 +52,8 @@ API = [
     "/api/dealer_greeks/NVDA?convention=inverted",
     "/api/dealer_greeks/AMD?basis=volume",
     "/api/iv_surface/NVDA",
+    "/api/freshness?sym=SPY",
+    "/api/size?equity=25000&risk_pct=1&entry=100&stop=97",
     "/api/mc/validate?paths=20000&steps=32",
     "/api/heatseeker?symbols=SPY,QQQ",
     # Atlas returns an empty frame list on a fresh clone (no captured

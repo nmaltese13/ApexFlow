@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %} · Journal{% endblock %}
+{% block content %}
+
+<div class="dash journal-page">
+
+  <div class="jr-tabs" role="tablist">
+    <button class="jr-tab active" data-panel="jr-watchlist" role="tab" aria-selected="true">
+      Watchlist <span class="jr-count">{{ entries|length }}</span>
+    </button>
+    <button class="jr-tab" data-panel="jr-log" role="tab" aria-selected="false">
+      Signal log <span class="jr-count">{{ records|length }}</span>
+    </button>
+  </div>
+
+  <!-- ================= WATCHLIST ================= -->
+  <section class="panel jr-panel" id="jr-watchlist">
+    <div class="panel-head">
+      <h3>Watchlist</h3>
+      <div class="inline-controls">
+        <span class="panel-sub">Auto-populated by scans (score ≥ 60)</span>
+        <button id="wl-clear" class="btn-secondary">Clear</button>
+      </div>
+    </div>
+
+    {% if not entries %}
+      <div class="empty">
+        <div class="empty-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2.5l2.6 7.4 7.9.1-6.4 4.6 2.4 7.5L12 17.7 5.5 22.1 7.9 14.6 1.5 10l7.9-.1z"/></svg>
+        </div>
+        <div>Empty. Run scans from Flow — high-scoring symbols populate here.</div>
+      </div>
+    {% else %}
+    <div class="jr-scroll">
+      <table class="dtable">
+        <thead><tr>
+          <th>Symbol</th><th class="r">Score</th><th>Top Scanner</th><th>Hit By</th>
+          <th>Tags</th><th>Reason</th><th>Added</th>
+        </tr></thead>
+        <tbody>
+          {% for e in entries %}
+          <tr>
+            <td><a class="sym" href="/symbol/{{ e.symbol }}">{{ e.symbol }}</a></td>
+            <td class="r mono"><span class="score-{{ 'hot' if e.best_score>=85 else 'warm' if e.best_score>=70 else 'mild' }}">{{ '%.0f' % e.best_score }}</span></td>
+            <td>{{ e.best_scanner }}</td>
+            <td>{{ e.scanners_hit | join(', ') }}</td>
+            <td class="muted-sm">{{ e.tags | join(', ') }}</td>
+            <td class="reason">{{ e.reason }}</td>
+            <td class="muted-sm mono">{{ e.added_at[:19].replace('T',' ') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- ================= SIGNAL LOG ================= -->
+  <section class="panel jr-panel" id="jr-log" hidden>
+    <div class="panel-head">
+      <h3>Signal Log</h3>
+      <div class="inline-controls">
+        <input id="filt-sym" class="pick" type="text" placeholder="Filter symbol"
+               style="width:130px;text-transform:uppercase">
+        <select id="filt-scanner" class="pick">
+          <option value="">All scanners</option>
+          <option>options-flow</option>
+          <option>pre-breakout</option>
+          <option>momentum</option>
+          <option>squeeze</option>
+          <option>earnings</option>
+        </select>
+        <select id="filt-min-score" class="pick">
+          <option value="0">Any score</option>
+          <option value="50">Score ≥ 50</option>
+          <option value="70">Score ≥ 70</option>
+          <option value="85">Score ≥ 85</option>
+        </select>
+        <a class="btn-secondary" href="/api/log?limit=500" download="apexflow_log.json">Export</a>
+      </div>
+    </div>
+
+    {% if not records %}
+      <div class="empty">
+        <div class="empty-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 9h16 M4 14h16 M4 19h16"/></svg>
+        </div>
+        <div>No signals logged yet. Run a scan from Flow.</div>
+      </div>
+    {% else %}
+    <div class="jr-scroll">
+      <table class="dtable" id="log-table">
+        <thead><tr>
+          <th class="mono">Time</th><th>Scanner</th><th>Symbol</th><th class="r">Score</th>
+          <th>Tags</th><th>Reason</th>
+        </tr></thead>
+        <tbody>
+          {% for r in records %}
+          <tr data-sym="{{ r.symbol }}" data-scanner="{{ r.scanner }}" data-score="{{ r.score }}">
+            <td class="muted-sm mono">{{ r.timestamp[:19].replace('T',' ') }}</td>
+            <td>{{ r.scanner }}</td>
+            <td><a class="sym" href="/symbol/{{ r.symbol }}">{{ r.symbol }}</a></td>
+            <td class="r mono"><span class="score-{{ 'hot' if r.score>=85 else 'warm' if r.score>=70 else 'mild' }}">{{ '%.0f' % r.score }}</span></td>
+            <td class="muted-sm">{{ (r.tags or []) | join(', ') }}</td>
+            <td class="reason">{{ r.reason }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">
+      Showing <strong id="log-count">{{ records|length }}</strong> of the most
+      recent {{ limit }} entries, newest first.
+      {% if records|length >= limit %}
+        <a href="/journal?limit={{ limit * 4 }}">Load more →</a>
+      {% endif %}
+    </p>
+    {% endif %}
+  </section>
+
+</div>
+
+<script>
+/* Tabs. Both panels are rendered server-side, so switching is a class
+   toggle rather than a fetch — the whole point of merging them was to
+   answer "what has this flagged recently" from one place. */
+(function () {
+  const tabs = document.querySelectorAll('.jr-tab');
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(x => {
+      x.classList.remove('active');
+      x.setAttribute('aria-selected', 'false');
+    });
+    t.classList.add('active');
+    t.setAttribute('aria-selected', 'true');
+    document.querySelectorAll('.jr-panel').forEach(p => {
+      p.hidden = (p.id !== t.dataset.panel);
+    });
+    try { localStorage.setItem('jr_tab', t.dataset.panel); } catch {}
+  }));
+  try {
+    const saved = localStorage.getItem('jr_tab');
+    if (saved) document.querySelector(`.jr-tab[data-panel="${saved}"]`)?.click();
+  } catch {}
+})();
+
+/* Signal-log filters */
+(function () {
+  const table = document.getElementById('log-table');
+  if (!table) return;
+  const sym = document.getElementById('filt-sym');
+  const scanner = document.getElementById('filt-scanner');
+  const minScore = document.getElementById('filt-min-score');
+  const count = document.getElementById('log-count');
+
+  function apply() {
+    const s = (sym.value || '').trim().toUpperCase();
+    const sc = scanner.value;
+    const ms = parseFloat(minScore.value) || 0;
+    let shown = 0;
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      const ok = (!s || (tr.dataset.sym || '').includes(s))
+        && (!sc || tr.dataset.scanner === sc)
+        && (parseFloat(tr.dataset.score) || 0) >= ms;
+      tr.hidden = !ok;
+      if (ok) shown++;
+    });
+    if (count) count.textContent = shown;
+  }
+  [sym, scanner, minScore].forEach(el => {
+    el.addEventListener('input', apply);
+    el.addEventListener('change', apply);
+  });
+})();
+
+/* Clear watchlist */
+(function () {
+  const btn = document.getElementById('wl-clear');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    if (!confirm('Clear the whole watchlist?')) return;
+    try {
+      await fetch('/api/watchlist', { method: 'DELETE' });
+      location.reload();
+    } catch (e) {
+      if (typeof toast === 'function') toast('Could not clear: ' + e.message, 'err');
+    }
+  });
+})();
+</script>
+
+{% endblock %}

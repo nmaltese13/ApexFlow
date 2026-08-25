@@ -21,51 +21,50 @@
     <div class="brand-text">APEX<span>FLOW</span></div>
   </div>
   <nav>
-    <a href="/" class="navlink {% if page=='dashboard' %}active{% endif %}" data-tip="Flow Dashboard">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l4-4 4 4 7-7v3l-7 7-4-4-4 4z"/></svg>
+        <div class="nav-group-label">Structure</div>
+    <a href="/" class="navlink {% if page=='dashboard' %}active{% endif %}" data-tip="Live scanner output and alerts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
       <span>Flow</span>
     </a>
     <a href="/dealer" class="navlink {% if page=='dealer' %}active{% endif %}" data-tip="Dealer exposure — DEX / GEX / VEX / charm / vanna">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9"/><path d="M9 19V5"/><path d="M14 19v-8"/><path d="M19 19v-4"/><path d="M3 21h18"/></svg>
       <span>Dealer</span>
     </a>
-    <a href="/heatseeker" class="navlink {% if page=='heatseeker' %}active{% endif %}" data-tip="Heatseeker (Multi-Ticker GEX)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 3v3 M12 18v3 M3 12h3 M18 12h3"/></svg>
+    <a href="/heatseeker" class="navlink {% if page=='heatseeker' %}active{% endif %}" data-tip="Multi-symbol, multi-expiry GEX matrix">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       <span>Seek</span>
     </a>
-    <a href="/radar" class="navlink {% if page=='radar' %}active{% endif %}" data-tip="Squeeze Radar — composite ranker">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12L20 6" /><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" opacity="0.4"/></svg>
-      <span>Radar</span>
+    <a href="/vol" class="navlink {% if page=='vol' %}active{% endif %}" data-tip="Volatility term structure and skew">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3-9 6 3 9-4s6 2 9-5"/></svg>
+      <span>Vol</span>
     </a>
-    <a href="/atlas" class="navlink {% if page=='atlas' %}active{% endif %}" data-tip="Atlas — intraday GEX node history">
+    <a href="/atlas" class="navlink {% if page=='atlas' %}active{% endif %}" data-tip="Intraday GEX node history">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h4"/><path d="M3 12h9"/><path d="M3 6h6"/><circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="8" cy="18" r="1.6" fill="currentColor" stroke="none"/></svg>
       <span>Atlas</span>
     </a>
-    <a href="/brief" class="navlink {% if page=='brief' %}active{% endif %}" data-tip="Morning Briefing — pre-computed analysis 24/7">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10 M7 13h10 M7 17h6"/></svg>
-      <span>Brief</span>
+    <div class="nav-group-label">Screening</div>
+    <a href="/radar" class="navlink {% if page=='radar' %}active{% endif %}" data-tip="Composite squeeze screen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12L20 6"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" opacity="0.4"/></svg>
+      <span>Radar</span>
     </a>
-    <a href="/earnings" class="navlink {% if page=='earnings' %}active{% endif %}" data-tip="Earnings Scanner — bullish/bearish/neutral table">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19l4-7 5 5 7-12"/><path d="M16 5h4v4"/></svg>
+    <a href="/earnings" class="navlink {% if page=='earnings' %}active{% endif %}" data-tip="Earnings scanner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
       <span>Earn</span>
     </a>
-    <a href="/watchlist" class="navlink {% if page=='watchlist' %}active{% endif %}" data-tip="Watchlist">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M12 2.5l2.6 7.4 7.9.1-6.4 4.6 2.4 7.5L12 17.7 5.5 22.1 7.9 14.6 1.5 10l7.9-.1z"/></svg>
-      <span>List</span>
+    <a href="/brief" class="navlink {% if page=='brief' %}active{% endif %}" data-tip="Pre-computed briefings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l4 4v14H5z"/><path d="M8 12h8M8 16h5"/></svg>
+      <span>Brief</span>
     </a>
-    <a href="/log" class="navlink {% if page=='log' %}active{% endif %}" data-tip="Signal Log">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 9h16 M4 14h16 M4 19h16"/></svg>
-      <span>Log</span>
+    <div class="nav-group-label">Record</div>
+    <a href="/journal" class="navlink {% if page=='journal' %}active{% endif %}" data-tip="Watchlist and signal log">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5z"/><path d="M9 3v18"/><path d="M13 8h3M13 12h3"/></svg>
+      <span>Journal</span>
     </a>
-    <a href="/backtest" class="navlink {% if page=='backtest' %}active{% endif %}" data-tip="Backtest">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-7"/></svg>
-      <span>BT</span>
-    </a>
-    <a href="/guide" class="navlink {% if page=='guide' %}active{% endif %}" data-tip="Guide & Strategy">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22.5z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/></svg>
+    <a href="/guide" class="navlink {% if page=='guide' %}active{% endif %}" data-tip="How every number is computed">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v.01M12 13a2.5 2.5 0 10-2.5-2.5"/></svg>
       <span>Guide</span>
     </a>
-  </nav>
+</nav>
   <div class="sidenav-footer">
     <label class="theme-toggle" data-tip="Skylit color convention: yellow = positive gamma, purple = negative">
       <input type="checkbox" id="gex-theme-toggle">

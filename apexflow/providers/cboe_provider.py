@@ -1,8 +1,8 @@
 """Cboe delayed option quotes — the best free options data available.
 
-No API key, no registration, no rate limit worth the name. Cboe publishes
-its own delayed quote feed as JSON, and for this project's purposes it beats
-yfinance on every axis that matters:
+No API key and no registration. Cboe publishes its own delayed quote feed
+as JSON, and for this project's purposes it beats yfinance on every axis
+that matters:
 
 ============================  ==========================  =====================
                               Cboe                        yfinance
@@ -11,7 +11,7 @@ Implied volatility            exchange-computed           vendor solver, often
                                                           garbage near expiry
 Greeks                        delta/gamma/vega/theta/rho  none
 Requests per full chain       **1** (all expiries)        one *per expiry*
-Rate limiting                 none observed               aggressive 429s
+Rate limiting                 429s under burst            aggressive 429s
 Index options (SPX, VIX)      yes                         poor/absent
 ============================  ==========================  =====================
 
@@ -51,6 +51,13 @@ Caveats
   gaps are the illiquid wings, which is exactly where a solver would have
   struggled anyway. Missing values come through as NaN rather than zero so
   ``iv_surface`` can filter them honestly.
+* **It does rate-limit.** An earlier version of this docstring claimed
+  otherwise; sweeping a universe produced HTTP 429 quickly enough to prove
+  it wrong. There is no published quota, so the provider treats 429 as a
+  signal to back off: an exponential pause (capped at five minutes) during
+  which cached chains are served and no new requests are made. Because one
+  request returns *every* expiry, normal single-symbol use rarely comes
+  near the limit — it is universe sweeps that do.
 * This is an undocumented public endpoint. It could change or disappear;
   the provider degrades to yfinance rather than breaking the app.
 
@@ -116,11 +123,21 @@ def parse_occ(contract: str) -> tuple[str, str, float] | None:
 
 
 class CboeProvider(DataProvider):
-    """Options from Cboe; price history and fundamentals from yfinance."""
+    """Options from Cboe; price history and fundamentals from yfinance.
+
+    Backoff state is class-level on purpose: every instance is talking to
+    the same host under the same (unpublished) quota, so a 429 seen by one
+    must pause all of them. A per-instance counter would let the scanner
+    hub and the request handlers each keep hammering independently.
+    """
 
     name = "cboe"
 
-    def __init__(self, ttl: int = 120, timeout: int = 25,
+    # Shared across instances — see the class docstring.
+    _backoff_until: float = 0.0
+    _consecutive_429: int = 0
+
+    def __init__(self, ttl: int = 300, timeout: int = 25,
                  fallback: DataProvider | None = None):
         self._ttl = ttl
         self._timeout = timeout
@@ -134,6 +151,32 @@ class CboeProvider(DataProvider):
             "Accept": "application/json",
         })
 
+    # -- rate limiting ----------------------------------------------------
+    @classmethod
+    def is_rate_limited(cls) -> bool:
+        return time.time() < cls._backoff_until
+
+    @classmethod
+    def backoff_remaining(cls) -> float:
+        return max(0.0, cls._backoff_until - time.time())
+
+    @classmethod
+    def _trip_backoff(cls) -> None:
+        """Exponential pause after a 429: 30s, 60s, 120s … capped at 5 min."""
+        cls._consecutive_429 += 1
+        wait = min(30 * (2 ** (cls._consecutive_429 - 1)), 300)
+        cls._backoff_until = max(cls._backoff_until, time.time() + wait)
+        log.warning("Cboe rate-limited; backing off %ds (#%d). Serving cached "
+                    "chains until then.", wait, cls._consecutive_429)
+
+    @classmethod
+    def _clear_backoff(cls) -> None:
+        if cls._consecutive_429:
+            log.info("Cboe recovered after %d rate-limit responses",
+                     cls._consecutive_429)
+        cls._consecutive_429 = 0
+        cls._backoff_until = 0.0
+
     # -- fetching ---------------------------------------------------------
     def _fetch_chain(self, symbol: str) -> pd.DataFrame | None:
         """Whole chain, every expiry, as one tidy frame. Cached."""
@@ -143,6 +186,14 @@ class CboeProvider(DataProvider):
         if hit and now - hit[0] < self._ttl:
             return hit[1]
 
+        # While backing off, spend nothing on requests that will 429 again.
+        # A stale chain is still useful and freshness.py makes its age
+        # visible; a burst of failures is useful to nobody.
+        if self.is_rate_limited():
+            if hit:
+                return hit[1]
+            return self._fallback_chain(key)
+
         url = BASE_URL.format(symbol=cboe_symbol(key))
         try:
             r = self._session.get(url, timeout=self._timeout)
@@ -150,8 +201,12 @@ class CboeProvider(DataProvider):
                 log.info("Cboe has no chain for %s", key)
                 self._cache[key] = (now, None)
                 return None
+            if r.status_code == 429:
+                self._trip_backoff()
+                return hit[1] if hit else self._fallback_chain(key)
             r.raise_for_status()
             payload = r.json()
+            self._clear_backoff()
         except Exception as e:
             log.warning("Cboe fetch failed for %s: %s", key, e)
             # Serve stale rather than nothing.
@@ -232,6 +287,17 @@ class CboeProvider(DataProvider):
         out["as_of"] = df.attrs.get("fetched_at")
         out["source"] = self.name
         return out
+
+    def _fallback_chain(self, symbol: str) -> pd.DataFrame | None:
+        """Nothing cached and Cboe is unavailable — return None.
+
+        Deliberately does not silently substitute yfinance chain data here:
+        the columns differ (no exchange Greeks), and quietly swapping the
+        source mid-session would make the freshness reporting lie about
+        where the numbers came from. `options_chain` handles the swap
+        explicitly at a level where the source can be reported honestly.
+        """
+        return None
 
     def full_chain(self, symbol: str) -> pd.DataFrame | None:
         """Every expiry in one frame — the reason to prefer this provider.
